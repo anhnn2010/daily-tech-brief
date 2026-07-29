@@ -88,6 +88,8 @@ sources:
     official: true
     tags: [cpython, releases, packaging, security]
 
+  # The official Atom feed currently returns HTTP 403 to automated clients.
+  # Keep the entry for future re-checks, but do not fetch it by default.
   - id: real_python
     name: Real Python
     provider: feed
@@ -96,9 +98,21 @@ sources:
     category: python
     priority: 7
     cadence: daily
-    enabled: true
+    enabled: false
     official: true
     tags: [tutorials, testing, automation]
+
+  - id: python_bytes
+    name: Python Bytes
+    provider: feed
+    format: rss
+    url: https://pythonbytes.fm/rss
+    category: python
+    priority: 7
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [news, packages, developer_tools, community]
 
   # Linux
   - id: arch_linux_news
