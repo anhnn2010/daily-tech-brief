@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Atom</title>
+  <link href="https://example.org/"/>
+  <updated>2026-07-29T09:00:00Z</updated>
+  <id>https://example.org/</id>
+  <entry>
+    <title>Linux Release</title>
+    <link href="https://example.org/linux-release"/>
+    <id>atom-1</id>
+    <updated>2026-07-29T09:00:00Z</updated>
+    <author><name>Linux Author</name></author>
+    <summary type="html">&lt;p&gt;New &lt;em&gt;release&lt;/em&gt; details.&lt;/p&gt;</summary>
+  </entry>
+</feed>

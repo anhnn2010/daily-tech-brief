@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example RSS</title>
+    <link>https://example.com</link>
+    <description>Example feed</description>
+    <item>
+      <title>Python &amp; Automation</title>
+      <link>https://example.com/python-automation</link>
+      <guid>rss-1</guid>
+      <pubDate>Wed, 29 Jul 2026 08:00:00 GMT</pubDate>
+      <author>Example Author</author>
+      <description><![CDATA[<p>A <strong>useful</strong> article.</p>]]></description>
+    </item>
+  </channel>
+</rss>

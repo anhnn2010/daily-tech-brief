@@ -2,17 +2,19 @@ schema_version: 1
 
 project:
   name: Daily Tech Brief
-  version: 0.1.0
+  version: 0.2.0
 
 runtime:
   output_dir: output
   lookback_hours: 48
   request_timeout_seconds: 20
   max_articles: 12
+  max_summary_chars: 2000
+  user_agent: DailyTechBrief/0.2.0 (+https://github.com/your-user/daily-tech-brief)
   fail_on_source_error: false
 
 features:
-  fetch_feeds: false
+  fetch_feeds: true
   ranking: false
   render_markdown: false
   render_html: false

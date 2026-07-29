@@ -1,3 +1,9 @@
+[project]
+name = "daily-tech-brief"
+version = "0.2.0"
+description = "A personal, automated technology news digest."
+requires-python = ">=3.11"
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

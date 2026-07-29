@@ -60,7 +60,9 @@ def load_project_config(config_dir: Path) -> ProjectConfig:
 
 def _validate_unique_source_ids(sources: tuple[Source, ...]) -> None:
     counts = Counter(source.id for source in sources)
-    duplicate_ids = sorted(source_id for source_id, count in counts.items() if count > 1)
+    duplicate_ids = sorted(
+        source_id for source_id, count in counts.items() if count > 1
+    )
     if duplicate_ids:
         raise ConfigError(f"Duplicate source ids: {', '.join(duplicate_ids)}")
 
@@ -115,7 +117,35 @@ def _validate_settings(settings_data: dict[str, Any]) -> None:
     if not isinstance(features, dict):
         raise ConfigError("settings.yml must contain a 'features' mapping")
 
-    if runtime.get("lookback_hours", 0) <= 0:
-        raise ConfigError("runtime.lookback_hours must be greater than zero")
-    if runtime.get("max_articles", 0) <= 0:
-        raise ConfigError("runtime.max_articles must be greater than zero")
+    _require_positive_number(runtime, "lookback_hours")
+    _require_positive_number(runtime, "request_timeout_seconds")
+    _require_positive_integer(runtime, "max_articles")
+    _require_positive_integer(runtime, "max_summary_chars")
+
+    output_dir = runtime.get("output_dir")
+    if not isinstance(output_dir, str) or not output_dir.strip():
+        raise ConfigError("runtime.output_dir must be a non-empty string")
+
+    user_agent = runtime.get("user_agent")
+    if not isinstance(user_agent, str) or not user_agent.strip():
+        raise ConfigError("runtime.user_agent must be a non-empty string")
+
+    fail_on_source_error = runtime.get("fail_on_source_error")
+    if not isinstance(fail_on_source_error, bool):
+        raise ConfigError("runtime.fail_on_source_error must be a boolean")
+
+    fetch_feeds = features.get("fetch_feeds")
+    if not isinstance(fetch_feeds, bool):
+        raise ConfigError("features.fetch_feeds must be a boolean")
+
+
+def _require_positive_number(data: dict[str, Any], key: str) -> None:
+    value = data.get(key)
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+        raise ConfigError(f"runtime.{key} must be greater than zero")
+
+
+def _require_positive_integer(data: dict[str, Any], key: str) -> None:
+    value = data.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ConfigError(f"runtime.{key} must be a positive integer")

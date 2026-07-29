@@ -7,13 +7,14 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Sequence
 
+from src.collector import collect_feeds, write_collection_outputs
 from src.config_loader import ProjectConfig, load_project_config
-from src.models import ConfigError
+from src.models import ConfigError, Source
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Validate and inspect the Daily Tech Brief configuration."
+        description="Collect RSS and Atom feeds for Daily Tech Brief."
     )
     parser.add_argument(
         "--config-dir",
@@ -22,14 +23,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory containing sources.yml, profile.yml, and settings.yml",
     )
     parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Override runtime.output_dir from settings.yml",
+    )
+    parser.add_argument(
+        "--source",
+        action="append",
+        default=[],
+        metavar="SOURCE_ID",
+        help="Fetch only this enabled source; may be specified multiple times",
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate configuration without fetching feeds",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
-        help="Print the configuration summary as JSON",
+        help="Print the validation or collection summary as JSON",
     )
     return parser
 
 
-def create_summary(config: ProjectConfig) -> dict[str, object]:
+def create_config_summary(config: ProjectConfig) -> dict[str, object]:
     categories: dict[str, list[dict[str, object]]] = defaultdict(list)
     for source in config.enabled_sources:
         categories[source.category].append(
@@ -43,7 +61,9 @@ def create_summary(config: ProjectConfig) -> dict[str, object]:
         )
 
     for category_sources in categories.values():
-        category_sources.sort(key=lambda source: (-int(source["priority"]), str(source["name"])))
+        category_sources.sort(
+            key=lambda source: (-int(source["priority"]), str(source["name"]))
+        )
 
     return {
         "project": config.settings["project"],
@@ -53,7 +73,7 @@ def create_summary(config: ProjectConfig) -> dict[str, object]:
     }
 
 
-def print_text_summary(summary: dict[str, object]) -> None:
+def print_config_summary(summary: dict[str, object]) -> None:
     project = summary["project"]
     assert isinstance(project, dict)
 
@@ -73,20 +93,78 @@ def print_text_summary(summary: dict[str, object]) -> None:
             )
 
 
+def _select_sources(config: ProjectConfig, source_ids: list[str]) -> tuple[Source, ...]:
+    if not source_ids:
+        return config.enabled_sources
+
+    enabled_by_id = {source.id: source for source in config.enabled_sources}
+    unknown = sorted(set(source_ids) - enabled_by_id.keys())
+    if unknown:
+        raise ConfigError(
+            "Unknown or disabled source ids: " + ", ".join(unknown)
+        )
+    return tuple(enabled_by_id[source_id] for source_id in dict.fromkeys(source_ids))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     try:
         config = load_project_config(args.config_dir)
+        selected_sources = _select_sources(config, args.source)
     except ConfigError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
 
-    summary = create_summary(config)
+    if args.validate_only:
+        summary = create_config_summary(config)
+        if args.json:
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+        else:
+            print_config_summary(summary)
+        return 0
+
+    if not config.settings["features"]["fetch_feeds"]:
+        print(
+            "Configuration error: features.fetch_feeds is disabled",
+            file=sys.stderr,
+        )
+        return 2
+
+    result = collect_feeds(config, sources=selected_sources)
+    output_dir = args.output_dir or Path(config.settings["runtime"]["output_dir"])
+    raw_path, report_path = write_collection_outputs(
+        result=result,
+        output_dir=output_dir,
+        project=config.settings["project"],
+    )
+
+    summary = result.summary()
+    summary["raw_articles_path"] = str(raw_path)
+    summary["source_report_path"] = str(report_path)
+
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     else:
-        print_text_summary(summary)
+        print(f"Fetched sources: {result.fetched_sources}/{len(result.reports)}")
+        print(f"Warning sources: {result.warning_sources}")
+        print(f"Failed sources:  {result.failed_sources}")
+        print(f"Fetched articles: {len(result.articles)}")
+        print("\nOutput:")
+        print(f"- {raw_path}")
+        print(f"- {report_path}")
+
+        failed = [report for report in result.reports if report.status == "failed"]
+        if failed:
+            print("\nFailed source details:")
+            for report in failed:
+                print(f"- {report.source_id}: {report.error}")
+
+    fail_on_source_error = config.settings["runtime"]["fail_on_source_error"]
+    if result.failed_sources == len(result.reports):
+        return 1
+    if fail_on_source_error and result.failed_sources:
+        return 1
     return 0
 
 

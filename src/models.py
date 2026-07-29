@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
 
 class ConfigError(ValueError):
     """Raised when a project configuration is invalid."""
+
+
+class FeedFetchError(RuntimeError):
+    """Raised when a feed cannot be downloaded or parsed."""
 
 
 @dataclass(frozen=True)
@@ -97,3 +101,46 @@ class Source:
             raise ConfigError(f"Source '{self.id}' official must be a boolean")
         if not self.category:
             raise ConfigError(f"Source '{self.id}' category must not be empty")
+
+
+@dataclass(frozen=True)
+class Article:
+    source_id: str
+    source_name: str
+    category: str
+    source_priority: int
+    source_tags: tuple[str, ...]
+    title: str
+    url: str
+    external_id: str | None
+    published_at: str | None
+    updated_at: str | None
+    summary: str
+    author: str | None
+    fetched_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["source_tags"] = list(self.source_tags)
+        return data
+
+
+@dataclass(frozen=True)
+class SourceReport:
+    source_id: str
+    source_name: str
+    category: str
+    url: str
+    status: str
+    started_at: str
+    completed_at: str
+    duration_seconds: float
+    article_count: int
+    http_status: int | None = None
+    final_url: str | None = None
+    feed_title: str | None = None
+    warning: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
