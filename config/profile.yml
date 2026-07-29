@@ -1,0 +1,64 @@
+schema_version: 1
+
+profile:
+  name: personal-tech-profile
+  language: en
+  timezone: Asia/Ho_Chi_Minh
+
+categories:
+  ai:
+    label: AI
+    weight: 10
+    daily_quota: 2
+  automation_ci:
+    label: Automation / CI
+    weight: 10
+    daily_quota: 2
+  python:
+    label: Python
+    weight: 10
+    daily_quota: 2
+  linux:
+    label: Linux
+    weight: 10
+    daily_quota: 2
+  open_source:
+    label: Open Source / Engineering
+    weight: 9
+    daily_quota: 1
+  semiconductor:
+    label: Semiconductor
+    weight: 10
+    daily_quota: 2
+  test_engineering:
+    label: Test Engineering
+    weight: 10
+    daily_quota: 2
+  ebook:
+    label: Ebook
+    weight: 9
+    daily_quota: 1
+
+keywords:
+  high_priority:
+    - github actions
+    - jenkins
+    - jfrog
+    - python automation
+    - arch linux
+    - kde plasma
+    - post-silicon
+    - silicon validation
+    - test automation
+    - lab automation
+    - serdes
+    - pcie
+    - cxl
+    - ucie
+    - pam4
+    - koreader
+    - epub
+  low_priority:
+    - celebrity
+    - smartphone rumor
+    - gaming deal

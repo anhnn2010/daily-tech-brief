@@ -1,0 +1,213 @@
+schema_version: 1
+
+sources:
+  # AI
+  - id: openai_news
+    name: OpenAI News
+    provider: feed
+    format: rss
+    url: https://openai.com/news/rss.xml
+    category: ai
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [models, api, coding_agents]
+
+  - id: google_ai_technology
+    name: Google AI Technology
+    provider: feed
+    format: rss
+    url: https://blog.google/innovation-and-ai/technology/rss/
+    category: ai
+    priority: 9
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [gemini, developer_tools, research]
+
+  - id: hugging_face_blog
+    name: Hugging Face Blog
+    provider: feed
+    format: rss
+    url: https://huggingface.co/blog/feed.xml
+    category: ai
+    priority: 9
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [open_source_ai, models, inference]
+
+  # Automation / CI
+  - id: github_changelog
+    name: GitHub Changelog
+    provider: feed
+    format: rss
+    url: https://github.blog/changelog/feed/
+    category: automation_ci
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [github_actions, copilot, security, api]
+
+  - id: jenkins_blog
+    name: Jenkins Blog
+    provider: feed
+    format: rss
+    url: https://www.jenkins.io/rss.xml
+    category: automation_ci
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [jenkins, pipeline, plugins, ci]
+
+  - id: docker_blog
+    name: Docker Blog
+    provider: feed
+    format: rss
+    url: https://www.docker.com/blog/feed/
+    category: automation_ci
+    priority: 8
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [containers, build, devops]
+
+  # Python
+  - id: python_insider
+    name: Python Insider
+    provider: feed
+    format: rss
+    url: https://blog.python.org/rss.xml
+    category: python
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [cpython, releases, packaging, security]
+
+  - id: real_python
+    name: Real Python
+    provider: feed
+    format: atom
+    url: https://realpython.com/atom.xml
+    category: python
+    priority: 7
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [tutorials, testing, automation]
+
+  # Linux
+  - id: arch_linux_news
+    name: Arch Linux News
+    provider: feed
+    format: rss
+    url: https://archlinux.org/feeds/news/
+    category: linux
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [arch, packages, manual_intervention]
+
+  - id: planet_kde
+    name: Planet KDE
+    provider: feed
+    format: rss
+    url: https://planet.kde.org/rss20.xml
+    category: linux
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [kde, plasma, dolphin, kwin]
+
+  - id: linux_kernel_releases
+    name: Linux Kernel Releases
+    provider: feed
+    format: rss
+    url: https://www.kernel.org/feeds/kdist.xml
+    category: linux
+    priority: 8
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [kernel, releases, drivers]
+
+  # Open source / engineering
+  - id: github_blog
+    name: GitHub Blog
+    provider: feed
+    format: rss
+    url: https://github.blog/feed/
+    category: open_source
+    priority: 9
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [engineering, open_source, security, developer_tools]
+
+  # Semiconductor / test engineering
+  - id: synopsys_news
+    name: Synopsys News Releases
+    provider: feed
+    format: rss
+    url: https://news.synopsys.com/home?pagetemplate=rss
+    category: semiconductor
+    priority: 8
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [eda, verification, multi_die, silicon]
+
+  - id: cadence_verification
+    name: Cadence Verification Blog
+    provider: feed
+    format: rss
+    url: https://community.cadence.com/cadence_blogs_8/b/fv/rss
+    category: test_engineering
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [verification, pcie, cxl, ucie, serdes]
+
+  - id: cadence_corporate
+    name: Cadence Corporate News
+    provider: feed
+    format: rss
+    url: https://community.cadence.com/cadence_blogs_8/b/corporate-news/rss
+    category: semiconductor
+    priority: 7
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [eda, chiplets, ai_for_design, industry]
+
+  # Ebook
+  - id: koreader_releases
+    name: KOReader Releases
+    provider: feed
+    format: atom
+    url: https://github.com/koreader/koreader/releases.atom
+    category: ebook
+    priority: 10
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [koreader, kobo, plugins, releases]
+
+  - id: calibre_releases
+    name: calibre Releases
+    provider: feed
+    format: rss
+    url: https://calibre-ebook.com/changelog.rss
+    category: ebook
+    priority: 8
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [calibre, epub, conversion, releases]
