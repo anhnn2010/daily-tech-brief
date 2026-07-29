@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
 from typing import Any, Iterable
+from urllib.parse import urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,6 +15,16 @@ from src.models import Article, FeedFetchError, Source
 
 
 _WHITESPACE_RE = re.compile(r"\s+")
+
+_FEED_ACCEPT = (
+    "application/rss+xml, application/atom+xml, "
+    "application/xml, text/xml;q=0.9, */*;q=0.5"
+)
+_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/149.0.0.0 Safari/537.36"
+)
 
 
 class FeedProvider:
@@ -36,21 +47,7 @@ class FeedProvider:
         source: Source,
         fetched_at: datetime,
     ) -> tuple[list[Article], dict[str, Any]]:
-        try:
-            response = self._session.get(
-                source.url,
-                timeout=self._timeout_seconds,
-                headers={
-                    "User-Agent": self._user_agent,
-                    "Accept": (
-                        "application/rss+xml, application/atom+xml, "
-                        "application/xml, text/xml;q=0.9, */*;q=0.5"
-                    ),
-                },
-            )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            raise FeedFetchError(str(exc)) from exc
+        response, request_profile, retry_count = self._request(source)
 
         try:
             parsed = _parse_feed(response.content)
@@ -73,9 +70,58 @@ class FeedProvider:
             "http_status": response.status_code,
             "final_url": response.url,
             "feed_title": parsed.title,
+            "request_profile": request_profile,
+            "retry_count": retry_count,
             "warning": "Feed returned no entries" if not articles else None,
         }
         return articles, metadata
+
+    def _request(
+        self,
+        source: Source,
+    ) -> tuple[requests.Response, str, int]:
+        try:
+            response = self._session.get(
+                source.url,
+                timeout=self._timeout_seconds,
+                headers=self._default_headers(),
+            )
+
+            if response.status_code == 403:
+                response = self._session.get(
+                    source.url,
+                    timeout=self._timeout_seconds,
+                    headers=self._browser_compatible_headers(source.url),
+                )
+                request_profile = "browser_compatible"
+                retry_count = 1
+            else:
+                request_profile = "default"
+                retry_count = 0
+
+            response.raise_for_status()
+            return response, request_profile, retry_count
+        except requests.RequestException as exc:
+            raise FeedFetchError(str(exc)) from exc
+
+    def _default_headers(self) -> dict[str, str]:
+        return {
+            "User-Agent": self._user_agent,
+            "Accept": _FEED_ACCEPT,
+        }
+
+    @staticmethod
+    def _browser_compatible_headers(url: str) -> dict[str, str]:
+        parsed_url = urlsplit(url)
+        origin = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+        return {
+            "User-Agent": _BROWSER_USER_AGENT,
+            "Accept": _FEED_ACCEPT,
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Referer": origin,
+        }
 
 
 class ParsedFeed:
