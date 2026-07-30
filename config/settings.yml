@@ -2,7 +2,7 @@ schema_version: 1
 
 project:
   name: Daily Tech Brief
-  version: 0.4.0
+  version: 0.5.0
 
 runtime:
   output_dir: output
@@ -10,7 +10,7 @@ runtime:
   request_timeout_seconds: 20
   max_articles: 12
   max_summary_chars: 2000
-  user_agent: DailyTechBrief/0.4.0 (+https://github.com/your-user/daily-tech-brief)
+  user_agent: DailyTechBrief/0.5.0
   fail_on_source_error: false
 
 features:
