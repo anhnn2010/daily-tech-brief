@@ -16,6 +16,7 @@ from src.models import Article, ConfigError, Source
 from src.publishing.site_builder import build_static_site
 from src.ranking.rule_based import rank_articles
 from src.ranking.selection import select_articles_by_category_quota
+from src.renderers.epub import render_epub_digest
 from src.renderers.html import render_html_digest
 from src.renderers.markdown import render_markdown_digest
 
@@ -192,6 +193,25 @@ def _process_and_write_ranked_articles(
     else:
         rendering_summary["html"] = {"enabled": False}
 
+    if "render_epub" in features:
+        if features.get("render_epub", False):
+            epub_path = output_dir / "digest.epub"
+            epub_content = render_epub_digest(
+                selected_articles,
+                config.profile,
+                generated_at=ranking_result.evaluated_at,
+                project_name=str(config.settings["project"]["name"]),
+            )
+            _write_bytes_atomic(epub_path, epub_content)
+            rendering_summary["epub"] = {
+                "enabled": True,
+                "path": str(epub_path),
+                "article_count": len(selected_articles),
+                "size_bytes": len(epub_content),
+            }
+        else:
+            rendering_summary["epub"] = {"enabled": False}
+
     processing_summary["rendering"] = rendering_summary
     payload = {
         "schema_version": 1,
@@ -220,6 +240,13 @@ def _write_text_atomic(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_suffix(path.suffix + ".tmp")
     temporary_path.write_text(content, encoding="utf-8")
+    temporary_path.replace(path)
+
+
+def _write_bytes_atomic(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    temporary_path.write_bytes(content)
     temporary_path.replace(path)
 
 
@@ -324,7 +351,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         rendering = processing_summary.get("rendering", {})
         if isinstance(rendering, dict):
-            for renderer_name in ("markdown", "html"):
+            for renderer_name in ("markdown", "html", "epub"):
                 renderer_summary = rendering.get(renderer_name)
                 if (
                     isinstance(renderer_summary, dict)
