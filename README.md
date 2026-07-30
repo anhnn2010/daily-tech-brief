@@ -1,8 +1,8 @@
 # Daily Tech Brief
 
-Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, and selecting articles from RSS and Atom feeds.
+Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, selecting, and rendering articles from RSS and Atom feeds.
 
-Version **0.3.0** turns the raw feed collector into a rule-based daily digest pipeline. It keeps recent articles, removes duplicate URLs, scores articles against a personal interest profile, and selects a balanced top list using per-category quotas.
+Version **0.4.0** adds readable Markdown and standalone HTML digests on top of the v0.3.0 ranking pipeline.
 
 ## Python version
 
@@ -25,24 +25,26 @@ Rule-based ranking
 Category quota selection
     ↓
 ranked_articles.json
+    ↓
+digest.md
+digest.html
 ```
 
-## Included in v0.3.0
+## Included in v0.4.0
 
-- Everything from v0.2.x
-- Publication-time filtering with timezone support
-- Fallback from `published_at` to `updated_at`
-- Separate reporting for old, future, missing-date, and invalid-date articles
-- Canonical URL normalization
-- Removal of common tracking parameters
-- Duplicate grouping and best-record selection
-- Rule-based scoring with explainable score reasons
-- Source priority, category weight, freshness, and keyword scoring
-- High-priority keyword bonus and low-priority keyword penalty
-- Soft per-category daily quotas
-- Overflow filling when some categories do not have enough articles
-- End-to-end `ranked_articles.json` generation
-- Integration tests for the complete processing pipeline
+- Everything from v0.3.x
+- Markdown digest rendering
+- Standalone HTML digest rendering
+- Responsive HTML layout
+- Automatic light and dark mode
+- Print-friendly HTML styles
+- Category navigation
+- Category grouping using labels from `profile.yml`
+- Local timezone conversion
+- Markdown and HTML escaping
+- Atomic output writes
+- Rendering metadata in `ranked_articles.json`
+- Integration tests for the complete rendering pipeline
 
 ## Project structure
 
@@ -62,6 +64,9 @@ daily-tech-brief/
 │   ├── ranking/
 │   │   ├── rule_based.py
 │   │   └── selection.py
+│   ├── renderers/
+│   │   ├── html.py
+│   │   └── markdown.py
 │   ├── collector.py
 │   ├── config_loader.py
 │   ├── main.py
@@ -74,7 +79,10 @@ daily-tech-brief/
 │   ├── test_collector.py
 │   ├── test_config.py
 │   ├── test_deduplicate.py
+│   ├── test_html_renderer.py
 │   ├── test_main_pipeline.py
+│   ├── test_markdown_renderer.py
+│   ├── test_rendering_pipeline.py
 │   ├── test_rule_based_ranking.py
 │   └── test_time_filter.py
 ├── .gitignore
@@ -146,51 +154,95 @@ python -m src.main --json
 output/
 ├── raw_articles.json
 ├── source_report.json
-└── ranked_articles.json
+├── ranked_articles.json
+├── digest.md
+└── digest.html
 ```
 
 ### `raw_articles.json`
 
 Contains all normalized articles returned by successful RSS and Atom sources.
 
-Each article includes:
-
-- source ID, source name, category, priority, and tags
-- title and entry URL
-- feed entry ID
-- publication and update times when available
-- cleaned summary
-- author when available
-- fetch time
-
 ### `source_report.json`
 
 Contains one report per requested source:
 
-- status: `success`, `warning`, or `failed`
-- request duration
-- HTTP status and final URL
-- retry count and request profile
-- feed title
-- article count
-- parser warning or error details
+- status: `success`, `warning`, or `failed`;
+- request duration;
+- HTTP status and final URL;
+- retry count and request profile;
+- feed title;
+- article count;
+- parser warning or error details.
 
 ### `ranked_articles.json`
 
-Contains the final selected articles and full processing statistics:
+Contains the final selected articles and processing statistics:
 
-- time-filter summary
-- deduplication summary
-- ranking summary
-- category quota selection summary
-- selected article count
-- per-article score
-- score reasons
-- matched high-priority keywords
-- matched low-priority keywords
-- freshness in hours
+- time-filter summary;
+- deduplication summary;
+- ranking summary;
+- category quota selection summary;
+- rendering summary;
+- selected article count;
+- per-article score;
+- score reasons;
+- matched keywords;
+- freshness in hours.
 
-## Inspect the selected articles
+### `digest.md`
+
+A portable Markdown edition grouped by category.
+
+Each article contains:
+
+- linked title;
+- source;
+- publication time;
+- ranking score;
+- cleaned summary;
+- matched interests;
+- original article link.
+
+### `digest.html`
+
+A standalone HTML edition that can be:
+
+- opened locally;
+- read on desktop or mobile;
+- published through GitHub Pages;
+- printed or exported to PDF;
+- viewed in light or dark mode.
+
+The page does not require JavaScript, external CSS, external fonts, or a CDN.
+
+## Open the generated digest
+
+On Linux:
+
+```bash
+xdg-open output/digest.html
+```
+
+On macOS:
+
+```bash
+open output/digest.html
+```
+
+On Windows PowerShell:
+
+```powershell
+Start-Process output/digest.html
+```
+
+Read Markdown in the terminal:
+
+```bash
+less output/digest.md
+```
+
+## Inspect selected articles
 
 ```bash
 python - <<'PY'
@@ -207,7 +259,7 @@ for index, article in enumerate(data["articles"], 1):
 PY
 ```
 
-Inspect the category distribution:
+Inspect category distribution:
 
 ```bash
 python - <<'PY'
@@ -224,6 +276,25 @@ counts = Counter(
 
 for category, count in sorted(counts.items()):
     print(f"{category}: {count}")
+PY
+```
+
+Inspect rendering metadata:
+
+```bash
+python - <<'PY'
+import json
+
+with open("output/ranked_articles.json", encoding="utf-8") as file:
+    data = json.load(file)
+
+print(
+    json.dumps(
+        data["summary"]["rendering"],
+        indent=2,
+        ensure_ascii=False,
+    )
+)
 PY
 ```
 
@@ -266,7 +337,7 @@ The final score never goes below zero.
 
 ## Category quotas
 
-The current personal profile selects at most 12 articles per run:
+The personal profile selects at most 12 articles per run:
 
 | Category | Daily quota |
 |---|---:|
@@ -283,7 +354,7 @@ The current personal profile selects at most 12 articles per run:
 The quotas are soft:
 
 1. The first pass respects each category quota.
-2. If the digest still has unused slots, the highest-ranked remaining articles fill them.
+2. If the digest has unused slots, the highest-ranked remaining articles fill them.
 3. A category with `daily_quota: 0` is excluded completely.
 
 Edit these values in:
@@ -292,9 +363,28 @@ Edit these values in:
 config/profile.yml
 ```
 
+## Rendering configuration
+
+Rendering is controlled in `config/settings.yml`:
+
+```yaml
+features:
+  ranking: true
+  render_markdown: true
+  render_html: true
+```
+
+Disable a renderer without changing code:
+
+```yaml
+features:
+  render_markdown: false
+  render_html: true
+```
+
 ## Runtime configuration
 
-Important settings in `config/settings.yml`:
+Important settings:
 
 ```yaml
 runtime:
@@ -306,20 +396,13 @@ runtime:
   fail_on_source_error: false
 ```
 
-Ranking is enabled through:
-
-```yaml
-features:
-  ranking: true
-```
-
 ## Run tests
 
 ```bash
 python -m pytest -q
 ```
 
-The current suite contains 60 offline tests. Feed parser tests use local RSS and Atom fixtures and do not require internet access.
+The current suite contains **84 offline tests**. Feed parser tests use local RSS and Atom fixtures and do not require internet access.
 
 ## Exit codes
 
@@ -333,30 +416,32 @@ By default:
 fail_on_source_error: false
 ```
 
-A failed feed is therefore recorded in `source_report.json` without stopping successful sources.
+A failed feed is recorded in `source_report.json` without stopping successful sources.
 
-## v0.3.0 acceptance criteria
+## v0.4.0 acceptance criteria
 
-- Articles outside the configured lookback window are excluded.
-- Missing and invalid dates are reported separately.
-- Equivalent URLs are deduplicated.
-- Tracking parameters do not create false duplicates.
-- Ranking is deterministic and explainable.
-- Category quotas prevent a single topic from dominating the digest.
-- Unused category slots can be filled by the best remaining articles.
-- `ranked_articles.json` is written atomically.
-- The complete processing pipeline is covered by integration tests.
+- The v0.3.0 ranking pipeline remains functional.
+- `digest.md` is generated when Markdown rendering is enabled.
+- `digest.html` is generated when HTML rendering is enabled.
+- Empty categories are omitted.
+- Article links point to original sources.
+- Feed content is safely escaped.
+- Times are shown in the configured local timezone.
+- HTML is responsive and standalone.
+- Rendering metadata is recorded in `ranked_articles.json`.
+- All 84 tests pass.
 
 ## Next version
 
-**v0.4.0 — Digest Rendering**
+**v0.5.0 — GitHub Actions**
 
 Planned work:
 
-- Generate `digest.md`
-- Generate `digest.html`
-- Group selected articles by category
-- Add a clean daily brief layout
-- Keep links to original sources
-- Skip empty categories
-- Add renderer unit tests
+- Add a workflow running on `ubuntu-24.04`.
+- Use Python 3.12.
+- Support manual runs and scheduled runs.
+- Validate configuration.
+- Run tests.
+- Generate all outputs.
+- Upload output files as a GitHub Actions artifact.
+- Keep publishing disabled until the staging workflow is stable.
