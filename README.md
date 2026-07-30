@@ -1,8 +1,8 @@
 # Daily Tech Brief
 
-Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, selecting, and rendering articles from RSS and Atom feeds.
+Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, selecting, rendering, and automating technology digests from RSS and Atom feeds.
 
-Version **0.4.0** adds readable Markdown and standalone HTML digests on top of the v0.3.0 ranking pipeline.
+Version **0.5.0** adds GitHub Actions automation on top of the v0.4.0 Markdown and HTML rendering pipeline.
 
 ## Python version
 
@@ -28,28 +28,32 @@ ranked_articles.json
     ↓
 digest.md
 digest.html
+    ↓
+GitHub Actions artifact
 ```
 
-## Included in v0.4.0
+## Included in v0.5.0
 
-- Everything from v0.3.x
-- Markdown digest rendering
-- Standalone HTML digest rendering
-- Responsive HTML layout
-- Automatic light and dark mode
-- Print-friendly HTML styles
-- Category navigation
-- Category grouping using labels from `profile.yml`
-- Local timezone conversion
-- Markdown and HTML escaping
-- Atomic output writes
-- Rendering metadata in `ranked_articles.json`
-- Integration tests for the complete rendering pipeline
+- Everything from v0.4.x
+- GitHub Actions workflow
+- Manual staging and production runs
+- Daily production schedule
+- GitHub Environments support
+- Python 3.12 on `ubuntu-24.04`
+- Configuration validation in CI
+- Offline test execution in CI
+- Digest generation in CI
+- Artifact upload
+- 14-day artifact retention
+- Workflow regression tests
 
 ## Project structure
 
 ```text
 daily-tech-brief/
+├── .github/
+│   └── workflows/
+│       └── generate_digest.yml
 ├── config/
 │   ├── profile.yml
 │   ├── settings.yml
@@ -79,6 +83,7 @@ daily-tech-brief/
 │   ├── test_collector.py
 │   ├── test_config.py
 │   ├── test_deduplicate.py
+│   ├── test_github_workflow.py
 │   ├── test_html_renderer.py
 │   ├── test_main_pipeline.py
 │   ├── test_markdown_renderer.py
@@ -91,7 +96,7 @@ daily-tech-brief/
 └── README.md
 ```
 
-## Setup
+## Local setup
 
 ```bash
 python -m venv .venv
@@ -119,9 +124,7 @@ Machine-readable validation summary:
 python -m src.main --validate-only --json
 ```
 
-The current source registry contains 18 configured sources, with 17 enabled by default.
-
-## Run the pipeline
+## Run locally
 
 Fetch and process all enabled sources:
 
@@ -129,7 +132,7 @@ Fetch and process all enabled sources:
 python -m src.main
 ```
 
-Run selected sources while debugging:
+Run selected sources:
 
 ```bash
 python -m src.main --source arch_linux_news
@@ -140,12 +143,6 @@ Write outputs to another directory:
 
 ```bash
 python -m src.main --output-dir output/debug
-```
-
-Print a machine-readable execution summary:
-
-```bash
-python -m src.main --json
 ```
 
 ## Generated outputs
@@ -161,240 +158,250 @@ output/
 
 ### `raw_articles.json`
 
-Contains all normalized articles returned by successful RSS and Atom sources.
+Contains all normalized feed entries returned by successful sources.
 
 ### `source_report.json`
 
 Contains one report per requested source:
 
-- status: `success`, `warning`, or `failed`;
+- status;
 - request duration;
-- HTTP status and final URL;
-- retry count and request profile;
-- feed title;
+- HTTP status;
+- retry count;
+- request profile;
 - article count;
-- parser warning or error details.
+- parser warning or error.
 
 ### `ranked_articles.json`
 
-Contains the final selected articles and processing statistics:
+Contains:
 
-- time-filter summary;
+- filtering summary;
 - deduplication summary;
 - ranking summary;
-- category quota selection summary;
+- category selection summary;
 - rendering summary;
-- selected article count;
-- per-article score;
+- selected articles;
 - score reasons;
-- matched keywords;
-- freshness in hours.
+- matched keywords.
 
 ### `digest.md`
 
 A portable Markdown edition grouped by category.
 
-Each article contains:
-
-- linked title;
-- source;
-- publication time;
-- ranking score;
-- cleaned summary;
-- matched interests;
-- original article link.
-
 ### `digest.html`
 
-A standalone HTML edition that can be:
+A standalone responsive HTML edition that can be opened locally or published later through GitHub Pages.
 
-- opened locally;
-- read on desktop or mobile;
-- published through GitHub Pages;
-- printed or exported to PDF;
-- viewed in light or dark mode.
+## Open the digest
 
-The page does not require JavaScript, external CSS, external fonts, or a CDN.
-
-## Open the generated digest
-
-On Linux:
+Linux:
 
 ```bash
 xdg-open output/digest.html
 ```
 
-On macOS:
+macOS:
 
 ```bash
 open output/digest.html
 ```
 
-On Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
 Start-Process output/digest.html
 ```
 
-Read Markdown in the terminal:
+## GitHub Actions workflow
 
-```bash
-less output/digest.md
-```
-
-## Inspect selected articles
-
-```bash
-python - <<'PY'
-import json
-
-with open("output/ranked_articles.json", encoding="utf-8") as file:
-    data = json.load(file)
-
-for index, article in enumerate(data["articles"], 1):
-    print(
-        f"{index:02}. [{article['score']}] "
-        f"[{article['category']}] {article['title']}"
-    )
-PY
-```
-
-Inspect category distribution:
-
-```bash
-python - <<'PY'
-import json
-from collections import Counter
-
-with open("output/ranked_articles.json", encoding="utf-8") as file:
-    data = json.load(file)
-
-counts = Counter(
-    article["category"]
-    for article in data["articles"]
-)
-
-for category, count in sorted(counts.items()):
-    print(f"{category}: {count}")
-PY
-```
-
-Inspect rendering metadata:
-
-```bash
-python - <<'PY'
-import json
-
-with open("output/ranked_articles.json", encoding="utf-8") as file:
-    data = json.load(file)
-
-print(
-    json.dumps(
-        data["summary"]["rendering"],
-        indent=2,
-        ensure_ascii=False,
-    )
-)
-PY
-```
-
-## Ranking model
-
-The current scorer is deterministic and explainable.
-
-### Source priority
+The workflow is stored at:
 
 ```text
-source_priority × 2
+.github/workflows/generate_digest.yml
 ```
 
-### Category weight
+It uses:
 
 ```text
-category_weight × 2
+Runner:  ubuntu-24.04
+Python:  3.12
 ```
 
-### Freshness bonus
-
-| Article age | Bonus |
-|---|---:|
-| Up to 6 hours | +10 |
-| Up to 12 hours | +8 |
-| Up to 24 hours | +6 |
-| Up to 36 hours | +4 |
-| Up to 48 hours | +2 |
-| Older than 48 hours | +0 |
-
-### Keyword scoring
-
-- High-priority keyword in title: `+8`
-- High-priority keyword in summary or source tags: `+4`
-- Maximum high-priority keyword bonus: `+24`
-- Low-priority keyword match: `-6`
-- Maximum low-priority keyword penalty: `-12`
-
-The final score never goes below zero.
-
-## Category quotas
-
-The personal profile selects at most 12 articles per run:
-
-| Category | Daily quota |
-|---|---:|
-| AI | 2 |
-| Automation / CI | 2 |
-| Python | 1 |
-| Linux | 2 |
-| Open Source / Engineering | 1 |
-| Semiconductor | 2 |
-| Test Engineering | 1 |
-| Ebook | 1 |
-| **Total** | **12** |
-
-The quotas are soft:
-
-1. The first pass respects each category quota.
-2. If the digest has unused slots, the highest-ranked remaining articles fill them.
-3. A category with `daily_quota: 0` is excluded completely.
-
-Edit these values in:
+The workflow runs:
 
 ```text
-config/profile.yml
+Checkout
+→ Set up Python
+→ Install dependencies
+→ Validate configuration
+→ Run tests
+→ Generate digest
+→ Upload artifact
 ```
 
-## Rendering configuration
+## Manual workflow runs
 
-Rendering is controlled in `config/settings.yml`:
+Open the repository on GitHub:
+
+```text
+Actions
+→ Generate Daily Tech Brief
+→ Run workflow
+```
+
+Choose one environment:
+
+```text
+staging
+production
+```
+
+The default is:
+
+```text
+staging
+```
+
+Both environments currently run the same code and generate the same files. They are separated now so later versions can publish production output while staging remains artifact-only.
+
+## Scheduled workflow
+
+The workflow contains:
 
 ```yaml
-features:
-  ranking: true
-  render_markdown: true
-  render_html: true
+schedule:
+  - cron: "30 23 * * *"
 ```
 
-Disable a renderer without changing code:
+This runs at approximately:
 
-```yaml
-features:
-  render_markdown: false
-  render_html: true
+```text
+06:30 Asia/Ho_Chi_Minh
 ```
 
-## Runtime configuration
+Scheduled runs always use the `production` environment.
 
-Important settings:
+GitHub Actions schedules use UTC and may start a little later during periods of high GitHub Actions load.
 
-```yaml
-runtime:
-  output_dir: output
-  lookback_hours: 48
-  request_timeout_seconds: 20
-  max_articles: 12
-  max_summary_chars: 2000
-  fail_on_source_error: false
+## GitHub Environments
+
+Create the following repository environments:
+
+```text
+Settings
+→ Environments
 ```
+
+Environment names:
+
+```text
+staging
+production
+```
+
+No secrets are required in v0.5.0.
+
+Later versions may store environment-specific values such as:
+
+```text
+AI_API_KEY
+PUBLISH_TARGET
+RELEASE_CHANNEL
+```
+
+## Workflow artifacts
+
+A successful run uploads an artifact named like:
+
+```text
+daily-tech-brief-staging-12
+daily-tech-brief-production-13
+```
+
+The artifact contains:
+
+```text
+raw_articles.json
+source_report.json
+ranked_articles.json
+digest.md
+digest.html
+```
+
+Artifact retention:
+
+```text
+14 days
+```
+
+### Download through the GitHub website
+
+```text
+Repository
+→ Actions
+→ Select a workflow run
+→ Artifacts
+→ Select the artifact
+```
+
+GitHub downloads the artifact as a ZIP file.
+
+GitHub Mobile may show workflow runs and logs without exposing the artifact download clearly. On a phone, open the workflow run in a web browser to download the artifact.
+
+## Staging and production behavior
+
+### Staging
+
+Use staging for:
+
+- testing source changes;
+- testing ranking changes;
+- checking layout changes;
+- checking workflow changes;
+- reviewing artifact output.
+
+Current behavior:
+
+```text
+Generate
+→ Upload artifact
+```
+
+### Production
+
+Production is used by scheduled runs and can also be selected manually.
+
+Current behavior:
+
+```text
+Generate
+→ Upload artifact
+```
+
+Future behavior:
+
+```text
+Generate
+→ Upload artifact
+→ Publish GitHub Pages
+→ Create or update Release
+```
+
+Publishing is intentionally postponed until the workflow is stable.
+
+## Workflow concurrency
+
+Only one run per environment is kept active:
+
+```text
+staging
+production
+```
+
+When a newer run starts for the same environment, the older active run is cancelled.
+
+This avoids duplicate daily runs and unnecessary artifact generation.
 
 ## Run tests
 
@@ -402,12 +409,24 @@ runtime:
 python -m pytest -q
 ```
 
-The current suite contains **84 offline tests**. Feed parser tests use local RSS and Atom fixtures and do not require internet access.
+The current suite contains **89 offline tests**.
+
+The GitHub workflow tests verify that the workflow retains:
+
+- manual trigger;
+- scheduled trigger;
+- `ubuntu-24.04`;
+- Python 3.12;
+- staging and production;
+- validation;
+- test execution;
+- digest generation;
+- artifact upload.
 
 ## Exit codes
 
 - `0`: configuration is valid and at least one requested source succeeded
-- `1`: every requested source failed, or source errors are configured as fatal
+- `1`: every requested source failed, or source errors are fatal
 - `2`: invalid configuration, invalid source selection, or processing error
 
 By default:
@@ -416,32 +435,32 @@ By default:
 fail_on_source_error: false
 ```
 
-A failed feed is recorded in `source_report.json` without stopping successful sources.
+A failed source is recorded without stopping successful sources.
 
-## v0.4.0 acceptance criteria
+## v0.5.0 acceptance criteria
 
-- The v0.3.0 ranking pipeline remains functional.
-- `digest.md` is generated when Markdown rendering is enabled.
-- `digest.html` is generated when HTML rendering is enabled.
-- Empty categories are omitted.
-- Article links point to original sources.
-- Feed content is safely escaped.
-- Times are shown in the configured local timezone.
-- HTML is responsive and standalone.
-- Rendering metadata is recorded in `ranked_articles.json`.
-- All 84 tests pass.
+- Local configuration validation succeeds.
+- All 89 tests pass.
+- The workflow appears in the GitHub Actions tab.
+- A manual staging run completes successfully.
+- A manual production run completes successfully.
+- The workflow uses Python 3.12 on `ubuntu-24.04`.
+- The workflow creates all five output files.
+- The artifact can be downloaded from the workflow run page.
+- Scheduled runs resolve to the production environment.
+- Staging and production use the same workflow and source code.
+- No GitHub Pages or Release publishing occurs yet.
 
 ## Next version
 
-**v0.5.0 — GitHub Actions**
+**v0.6.0 — GitHub Pages Publishing**
 
 Planned work:
 
-- Add a workflow running on `ubuntu-24.04`.
-- Use Python 3.12.
-- Support manual runs and scheduled runs.
-- Validate configuration.
-- Run tests.
-- Generate all outputs.
-- Upload output files as a GitHub Actions artifact.
-- Keep publishing disabled until the staging workflow is stable.
+- Prepare a static site directory.
+- Publish `digest.html` as the latest edition.
+- Keep dated HTML archives.
+- Add a simple archive index.
+- Publish only from production.
+- Keep staging artifact-only.
+- Add Pages deployment tests.
