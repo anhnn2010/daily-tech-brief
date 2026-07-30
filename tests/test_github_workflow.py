@@ -41,7 +41,8 @@ def test_digest_workflow_runs_validation_tests_and_generation() -> None:
 
     assert "python -m src.main --validate-only" in workflow
     assert "python -m pytest -q" in workflow
-    assert "python -m src.main" in workflow
+    assert "Generate digest and static site" in workflow
+    assert "run: python -m src.main" in workflow
 
 
 def test_digest_workflow_supports_staging_and_production() -> None:
@@ -52,12 +53,57 @@ def test_digest_workflow_supports_staging_and_production() -> None:
     assert "- production" in workflow
     assert "environment:" in workflow
     assert 'target_environment="production"' in workflow
+    assert "TARGET_ENVIRONMENT=${target_environment}" in workflow
 
 
-def test_digest_workflow_uploads_generated_output() -> None:
+def test_digest_workflow_uploads_output_and_site_artifacts() -> None:
     workflow = read_workflow()
 
-    assert "actions/upload-artifact@v4" in workflow
+    assert workflow.count("actions/upload-artifact@v4") == 2
     assert "path: output/" in workflow
-    assert "if-no-files-found: warn" in workflow
+    assert "path: site/" in workflow
+    assert "daily-tech-brief-site-" in workflow
+    assert "include-hidden-files: true" in workflow
     assert "retention-days: 14" in workflow
+
+
+def test_production_restores_previous_site_archive() -> None:
+    workflow = read_workflow()
+
+    assert "Restore previous production site" in workflow
+    assert "env.TARGET_ENVIRONMENT == 'production'" in workflow
+    assert "daily-tech-brief-site-production-" in workflow
+    assert "/actions/artifacts?per_page=100" in workflow
+    assert "unzip -q" in workflow
+    assert "find site/archive" in workflow
+
+
+def test_pages_artifact_is_uploaded_only_for_production() -> None:
+    workflow = read_workflow()
+
+    assert "Upload GitHub Pages artifact" in workflow
+    assert "actions/upload-pages-artifact@v4" in workflow
+    assert "if: env.TARGET_ENVIRONMENT == 'production'" in workflow
+    assert "path: site/" in workflow
+    assert "retention-days: 1" in workflow
+
+
+def test_pages_deploy_job_has_required_configuration() -> None:
+    workflow = read_workflow()
+
+    assert "name: Deploy GitHub Pages" in workflow
+    assert (
+        "if: needs.generate.outputs.target_environment == 'production'"
+        in workflow
+    )
+    assert "pages: write" in workflow
+    assert "id-token: write" in workflow
+    assert "name: github-pages" in workflow
+    assert "steps.deployment.outputs.page_url" in workflow
+    assert "actions/configure-pages@v6" in workflow
+    assert "actions/deploy-pages@v4" in workflow
+    assert (
+        "artifact_name: "
+        "${{ needs.generate.outputs.pages_artifact_name }}"
+        in workflow
+    )
