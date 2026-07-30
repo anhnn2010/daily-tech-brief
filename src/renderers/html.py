@@ -16,6 +16,7 @@ def render_html_digest(
     generated_at: str | datetime,
     project_name: str = "Daily Tech Brief",
     include_scores: bool = True,
+    epub_href: str | None = None,
 ) -> str:
     """Render selected ranked articles as a standalone HTML document.
 
@@ -28,6 +29,12 @@ def render_html_digest(
         raise ValueError("project_name must be a non-empty string")
     if not isinstance(include_scores, bool):
         raise ValueError("include_scores must be a boolean")
+    if epub_href is not None:
+        if not isinstance(epub_href, str) or not epub_href.strip():
+            raise ValueError(
+                "epub_href must be None or a non-empty string"
+            )
+        epub_href = epub_href.strip()
 
     category_labels = _load_category_labels(profile)
     timezone_name = _load_timezone_name(profile)
@@ -69,6 +76,7 @@ def render_html_digest(
         timezone_name=timezone_name,
         include_scores=include_scores,
     )
+    edition_actions = _render_edition_actions(epub_href)
 
     return f"""<!doctype html>
 <html lang="{escape(language, quote=True)}">
@@ -153,6 +161,32 @@ def render_html_digest(
     .edition-meta {{
       margin: 14px 0 0;
       color: var(--muted);
+    }}
+
+    .edition-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 20px 0 0;
+    }}
+
+    .download-link {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 8px 14px;
+      background: var(--surface);
+      color: var(--accent);
+      font-weight: 700;
+      text-decoration: none;
+    }}
+
+    .download-link:hover {{
+      filter: brightness(1.08);
+      text-decoration: none;
     }}
 
     .category-nav {{
@@ -287,7 +321,7 @@ def render_html_digest(
       :root {{ color-scheme: light; }}
       body {{ background: #ffffff; }}
       .page {{ width: 100%; padding: 0; }}
-      .category-nav {{ display: none; }}
+      .category-nav, .edition-actions {{ display: none; }}
       .article-card {{ break-inside: avoid; box-shadow: none; }}
     }}
   </style>
@@ -301,7 +335,7 @@ def render_html_digest(
         Generated at {escape(generated_label)}
         · {article_count} {_pluralize("article", article_count)}
       </p>
-    </header>
+{edition_actions}    </header>
 {category_navigation}
 {digest_content}
     <footer class="footer">
@@ -312,6 +346,18 @@ def render_html_digest(
 </body>
 </html>
 """
+
+
+def _render_edition_actions(epub_href: str | None) -> str:
+    if epub_href is None:
+        return ""
+
+    return f'''      <p class="edition-actions">
+        <a class="download-link" href="{escape(epub_href, quote=True)}" download>
+          Download EPUB
+        </a>
+      </p>
+'''
 
 
 def _render_category_navigation(
