@@ -2,7 +2,7 @@
 
 Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, selecting, rendering, publishing, and automating technology digests from RSS and Atom feeds.
 
-Version **0.6.0** adds static-site generation and GitHub Pages deployment on top of the v0.5.0 GitHub Actions workflow.
+Version **0.7.0** adds EPUB 3 generation, TTS-friendly reading content, direct EPUB downloads from the website, and EPUB publication checks in GitHub Actions.
 
 ## Python version
 
@@ -28,30 +28,35 @@ ranked_articles.json
     ↓
 digest.md
 digest.html
+digest.epub
     ↓
 Static site builder
     ↓
 site/
     ↓
-GitHub Actions artifact
+GitHub Actions artifacts
 GitHub Pages
 ```
 
-## Included in v0.6.0
+## Included in v0.7.0
 
-- Everything from v0.5.x
-- Static-site generation
-- Latest digest page
-- Dated archive pages
-- Archive index in HTML and JSON
-- Site metadata
-- `.nojekyll`
-- Production archive restoration
-- Separate site artifact
-- Production-only GitHub Pages deployment
-- Staging remains artifact-only
-- GitHub Pages workflow tests
-- End-to-end site publishing integration tests
+- Everything from v0.6.x
+- EPUB 3 renderer
+- EPUB navigation document
+- NCX fallback navigation
+- Chapter-per-category layout
+- Unicode-safe XHTML
+- TTS-friendly article structure
+- Long URLs excluded from spoken text
+- Direct **Download EPUB** link in HTML
+- EPUB publication at site root
+- EPUB publication under `/latest/`
+- EPUB publication inside each dated archive
+- Same-day EPUB replacement
+- Previous archive EPUB preservation
+- EPUB workflow verification
+- EPUB renderer, pipeline, site, and workflow tests
+- No new runtime dependency
 
 ## Project structure
 
@@ -78,6 +83,7 @@ daily-tech-brief/
 │   │   ├── rule_based.py
 │   │   └── selection.py
 │   ├── renderers/
+│   │   ├── epub.py
 │   │   ├── html.py
 │   │   └── markdown.py
 │   ├── collector.py
@@ -92,6 +98,7 @@ daily-tech-brief/
 │   ├── test_collector.py
 │   ├── test_config.py
 │   ├── test_deduplicate.py
+│   ├── test_epub_renderer.py
 │   ├── test_github_workflow.py
 │   ├── test_html_renderer.py
 │   ├── test_main_pipeline.py
@@ -122,6 +129,8 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
+
+The EPUB renderer uses only the Python standard library, so v0.7.0 does not add a new package dependency.
 
 ## Validate configuration
 
@@ -164,7 +173,8 @@ output/
 ├── source_report.json
 ├── ranked_articles.json
 ├── digest.md
-└── digest.html
+├── digest.html
+└── digest.epub
 ```
 
 ### `raw_articles.json`
@@ -202,7 +212,172 @@ A portable Markdown edition grouped by category.
 
 ### `digest.html`
 
-A standalone responsive HTML edition.
+A standalone responsive HTML edition with a relative **Download EPUB** link when EPUB rendering is enabled.
+
+### `digest.epub`
+
+An EPUB 3 edition designed for normal reading and text-to-speech use.
+
+## EPUB structure
+
+The generated EPUB contains:
+
+```text
+digest.epub
+├── mimetype
+├── META-INF/
+│   └── container.xml
+└── EPUB/
+    ├── package.opf
+    ├── nav.xhtml
+    ├── toc.ncx
+    ├── styles.css
+    ├── title.xhtml
+    ├── category-ai.xhtml
+    ├── category-linux.xhtml
+    └── ...
+```
+
+The renderer provides:
+
+- EPUB 3 package metadata;
+- EPUB navigation through `nav.xhtml`;
+- NCX fallback navigation for older readers;
+- one chapter per non-empty category;
+- one section per selected article;
+- project title, language, creator, identifier, and modified time;
+- stable category ordering from `profile.yml`;
+- valid Unicode XHTML;
+- deterministic binary output for identical input.
+
+The `mimetype` file is stored first and without compression, as required by the EPUB container format.
+
+## TTS-friendly content
+
+Each article is rendered with a compact reading structure:
+
+```text
+Article title
+
+Source: Example News.
+Published: 2026-07-30 08:00 Asia/Ho_Chi_Minh.
+Author: Example Author.
+
+Article summary...
+
+Read the original article.
+```
+
+The EPUB intentionally excludes ranking-debug information such as:
+
+- score;
+- score reasons;
+- matched keywords.
+
+Long article URLs appear only in the link destination:
+
+```html
+<a href="https://example.com/very/long/article/url">
+  Read the original article
+</a>
+```
+
+The raw URL is not inserted as visible paragraph text, which prevents many TTS engines from reading the complete URL aloud.
+
+Feed summary whitespace is normalized before it is placed in the EPUB.
+
+## EPUB configuration
+
+EPUB rendering is controlled in:
+
+```text
+config/settings.yml
+```
+
+Current configuration:
+
+```yaml
+project:
+  version: 0.7.0
+
+runtime:
+  output_dir: output
+  site_dir: site
+  user_agent: DailyTechBrief/0.7.0
+
+features:
+  render_markdown: true
+  render_html: true
+  render_epub: true
+  build_site: true
+```
+
+Disable EPUB without disabling the other renderers:
+
+```yaml
+features:
+  render_epub: false
+```
+
+When disabled:
+
+- `output/digest.epub` is not created;
+- the HTML page does not show **Download EPUB**;
+- the site builder does not create empty EPUB files;
+- Markdown, HTML, JSON, and static-site generation continue normally.
+
+Configuration files created before v0.7.0 that do not contain `render_epub` remain compatible and behave as if EPUB rendering is disabled.
+
+## Inspect the EPUB
+
+List files inside the EPUB:
+
+```bash
+unzip -l output/digest.epub
+```
+
+Read its mimetype:
+
+```bash
+unzip -p output/digest.epub mimetype
+```
+
+Expected output:
+
+```text
+application/epub+zip
+```
+
+Check the ZIP container:
+
+```bash
+unzip -t output/digest.epub
+```
+
+The command should finish with:
+
+```text
+No errors detected in compressed data
+```
+
+## Reading the EPUB
+
+The generated file is intended for standards-compatible EPUB readers, including desktop, mobile, and e-reader applications.
+
+Typical flow:
+
+```text
+Open the Daily Tech Brief website
+→ Tap Download EPUB
+→ Save or open digest.epub
+→ Import it into the preferred EPUB reader
+```
+
+For KOReader, copy or download `digest.epub` to a directory visible in its file browser and open it as a normal book.
+
+For Readest or another mobile reader, download the file and import or open it through the application's normal file workflow.
+
+Actual layout and TTS voice behavior can vary by reader and device, so both Readest and KOReader should be checked during the v0.7.0 acceptance test.
 
 ## Static site output
 
@@ -212,6 +387,7 @@ The site builder creates:
 site/
 ├── index.html
 ├── digest.md
+├── digest.epub
 ├── ranked_articles.json
 ├── source_report.json
 ├── site.json
@@ -220,6 +396,7 @@ site/
 ├── latest/
 │   ├── index.html
 │   ├── digest.md
+│   ├── digest.epub
 │   ├── ranked_articles.json
 │   └── source_report.json
 │
@@ -231,6 +408,7 @@ site/
             └── DD/
                 ├── index.html
                 ├── digest.md
+                ├── digest.epub
                 ├── ranked_articles.json
                 └── source_report.json
 ```
@@ -251,10 +429,20 @@ After GitHub Pages deployment, the site provides:
 /archive/                 Archive index
 /archive/YYYY/MM/DD/      Dated edition
 /digest.md                Latest Markdown edition
+/digest.epub              Latest EPUB edition
+/latest/digest.epub       Latest EPUB edition
 /ranked_articles.json     Latest ranked JSON
 /source_report.json       Latest source report
 /site.json                Site metadata
 ```
+
+Every edition page uses the relative path:
+
+```text
+digest.epub
+```
+
+Because each HTML page and its EPUB file are stored in the same directory, the same link works at the site root, under `/latest/`, and in every dated archive.
 
 ## Open the site locally
 
@@ -276,33 +464,53 @@ Inspect the archive manifest:
 python -m json.tool site/archive/index.json
 ```
 
-## Static-site configuration
+Compare generated and published EPUB files:
 
-Static-site generation is controlled in:
+```bash
+cmp output/digest.epub site/digest.epub
+cmp output/digest.epub site/latest/digest.epub
+cmp output/digest.epub site/archive/*/*/*/digest.epub
+```
+
+A successful `cmp` command prints nothing and returns exit code `0`.
+
+## Archive behavior
+
+The archive builder:
+
+- preserves previous archive entries;
+- preserves EPUB files from previous dates;
+- adds the current local date;
+- replaces an existing edition for the same local date;
+- replaces the same-day EPUB with the newly generated EPUB;
+- removes stale files from the replaced same-day directory;
+- sorts editions newest first;
+- writes both HTML and JSON indexes.
+
+Archive manifest:
 
 ```text
-config/settings.yml
+site/archive/index.json
 ```
 
-Current configuration:
+Example:
 
-```yaml
-runtime:
-  output_dir: output
-  site_dir: site
-
-features:
-  ranking: true
-  render_markdown: true
-  render_html: true
-  build_site: true
-```
-
-Generated directories are ignored by Git:
-
-```gitignore
-output/
-site/
+```json
+{
+  "schema_version": 1,
+  "timezone": "Asia/Ho_Chi_Minh",
+  "latest_date": "2026-07-30",
+  "edition_count": 2,
+  "editions": [
+    {
+      "date": "2026-07-30",
+      "generated_at": "2026-07-29T23:30:00Z",
+      "article_count": 12,
+      "path": "2026/07/30/",
+      "title": "Daily Tech Brief"
+    }
+  ]
+}
 ```
 
 ## GitHub Actions workflow
@@ -331,10 +539,46 @@ Checkout
 → Run tests
 → Restore production archive when available
 → Generate digest and static site
+→ Verify EPUB publication
 → Upload data artifact
 → Upload site artifact
 → Deploy GitHub Pages for production
 ```
+
+## EPUB workflow verification
+
+Before any artifact is uploaded, the workflow checks that these files exist and are non-empty:
+
+```text
+output/digest.epub
+site/digest.epub
+site/latest/digest.epub
+```
+
+It then finds the current archive EPUB by comparing binary content rather than selecting an arbitrary archived date.
+
+The workflow verifies:
+
+```bash
+cmp output/digest.epub site/digest.epub
+cmp output/digest.epub site/latest/digest.epub
+cmp output/digest.epub "${archive_epub}"
+```
+
+It also verifies the website link:
+
+```bash
+grep -q 'href="digest.epub"' site/index.html
+grep -q 'Download EPUB' site/index.html
+```
+
+This step runs before:
+
+- data artifact upload;
+- static-site artifact upload;
+- Pages artifact upload.
+
+A workflow run therefore fails before publishing if the EPUB is missing, empty, incorrectly copied, or no longer linked from the page.
 
 ## Manual workflow runs
 
@@ -389,21 +633,25 @@ Staging performs:
 ```text
 Generate digest
 → Build site
+→ Verify EPUB publication
 → Upload output artifact
 → Upload site artifact
 ```
 
 Staging does **not**:
 
+- restore the production archive;
 - upload a GitHub Pages artifact;
 - deploy GitHub Pages;
 - replace the public website.
 
 Use staging for checking:
 
-- sources;
+- source collection;
 - ranking;
-- layout;
+- HTML layout;
+- EPUB structure;
+- EPUB download link;
 - archive structure;
 - workflow changes.
 
@@ -415,6 +663,7 @@ Production performs:
 Restore previous production site artifact
 → Generate current digest
 → Merge current edition into archive
+→ Verify EPUB publication
 → Upload output artifact
 → Upload site artifact
 → Upload Pages artifact
@@ -427,7 +676,7 @@ The production workflow restores the most recent unexpired site artifact named l
 daily-tech-brief-site-production-<run-number>-<run-attempt>
 ```
 
-This preserves dated archive editions between workflow runs.
+This preserves dated HTML, Markdown, JSON, and EPUB editions between workflow runs.
 
 If no previous production artifact exists, the workflow starts a new archive.
 
@@ -452,6 +701,7 @@ source_report.json
 ranked_articles.json
 digest.md
 digest.html
+digest.epub
 ```
 
 ### Site artifact
@@ -463,7 +713,7 @@ daily-tech-brief-site-staging-12-1
 daily-tech-brief-site-production-13-1
 ```
 
-Contains the complete `site/` directory.
+Contains the complete `site/` directory, including the latest EPUB and archived EPUB editions.
 
 Regular artifacts are retained for:
 
@@ -534,65 +784,42 @@ Deploy GitHub Pages
 
 job.
 
-## Archive behavior
-
-The archive builder:
-
-- preserves previous archive entries;
-- adds the current local date;
-- replaces an existing edition for the same local date;
-- removes stale files from the replaced same-day directory;
-- sorts editions newest first;
-- writes both HTML and JSON indexes.
-
-Archive manifest:
-
-```text
-site/archive/index.json
-```
-
-Example:
-
-```json
-{
-  "schema_version": 1,
-  "timezone": "Asia/Ho_Chi_Minh",
-  "latest_date": "2026-07-30",
-  "edition_count": 2,
-  "editions": [
-    {
-      "date": "2026-07-30",
-      "generated_at": "2026-07-29T23:30:00Z",
-      "article_count": 12,
-      "path": "2026/07/30/",
-      "title": "Daily Tech Brief"
-    }
-  ]
-}
-```
-
 ## Run tests
 
 ```bash
 python -m pytest -q
 ```
 
-The current suite contains **104 offline tests**.
+After all v0.7.0 files are applied, the expected project suite contains:
 
-The v0.6.0 tests cover:
+```text
+128 offline tests
+```
 
-- static-site directory generation;
-- latest edition;
-- archive creation;
-- local date conversion;
-- archive preservation;
-- same-day replacement;
-- optional files;
-- invalid metadata;
-- Pages workflow permissions;
-- production-only deployment;
-- Pages action versions;
-- end-to-end site publishing.
+The v0.7.0 tests cover:
+
+- EPUB ZIP structure;
+- uncompressed and first-position mimetype;
+- package metadata;
+- navigation document;
+- NCX fallback;
+- category chapters;
+- category slug collisions;
+- empty digests;
+- Unicode content;
+- XML escaping;
+- deterministic output;
+- TTS-friendly visible text;
+- hidden raw URLs;
+- EPUB feature flag behavior;
+- HTML download-link behavior;
+- EPUB pipeline summary;
+- root, latest, and archive publishing;
+- same-day EPUB replacement;
+- previous archive EPUB preservation;
+- production workflow verification;
+- verification ordering before artifact upload;
+- end-to-end Pages-ready EPUB publication.
 
 ## Exit codes
 
@@ -608,32 +835,67 @@ fail_on_source_error: false
 
 Individual source failures remain isolated.
 
-## v0.6.0 acceptance criteria
+## v0.7.0 acceptance criteria
 
 - Local configuration validation succeeds.
-- All 104 tests pass.
-- Local execution creates both `output/` and `site/`.
-- `site/index.html` opens correctly.
-- `site/archive/index.html` opens correctly.
-- Archive dates use `Asia/Ho_Chi_Minh`.
-- A staging workflow run uploads two regular artifacts.
-- Staging does not deploy Pages.
-- A production workflow run restores the prior site artifact when available.
-- Production uploads a Pages artifact.
-- Production deploys through the `github-pages` environment.
-- The public Pages URL loads the latest digest.
-- A second production run preserves the previous archive edition.
+- The complete offline test suite passes.
+- The final test count is confirmed in the local repository.
+- Local execution creates `output/digest.epub`.
+- `unzip -t output/digest.epub` reports no compressed-data errors.
+- EPUB metadata and navigation open correctly in an EPUB reader.
+- Vietnamese and English Unicode text display correctly.
+- TTS does not read full article URLs as visible text.
+- `output/digest.html` contains the **Download EPUB** link.
+- `site/digest.epub` matches the generated EPUB.
+- `site/latest/digest.epub` matches the generated EPUB.
+- The current dated archive contains the matching EPUB.
+- A same-day rerun replaces that day's EPUB without duplicating the edition.
+- A later-day run preserves EPUB files from earlier archive dates.
+- A staging workflow passes **Verify EPUB publication**.
+- The staging data artifact contains `digest.epub`.
+- The staging site artifact contains root, latest, and archive EPUB files.
+- A production workflow deploys the EPUB through GitHub Pages.
+- The public **Download EPUB** button downloads the latest EPUB.
+- The EPUB can be imported and opened in Readest.
+- The EPUB can be opened in KOReader.
+- Basic TTS reading is checked in at least one target reader.
+
+## Suggested v0.7.0 release check
+
+```bash
+python -m src.main --validate-only
+python -m pytest -q
+python -m src.main
+unzip -t output/digest.epub
+grep -n "Download EPUB" output/digest.html
+cmp output/digest.epub site/digest.epub
+cmp output/digest.epub site/latest/digest.epub
+```
+
+Then run a GitHub Actions staging build:
+
+```text
+Actions
+→ Generate Daily Tech Brief
+→ Run workflow
+→ Branch: master
+→ Environment: staging
+```
+
+Download and inspect both artifacts before running production.
 
 ## Next version
 
-**v0.7.0 — EPUB and TTS**
+**v0.8.0 — AI-assisted editor**
 
-Planned work:
+Candidate work:
 
-- Generate `digest.epub`.
-- Add EPUB metadata and navigation.
-- Create a TTS-friendly reading structure.
-- Avoid reading long URLs aloud.
-- Support Readest and KOReader.
-- Add EPUB validation and renderer tests.
-- Upload EPUB in workflow artifacts.
+- generate a concise editorial introduction;
+- rewrite feed summaries into a consistent style;
+- preserve source attribution;
+- prevent unsupported claims;
+- keep the original rule-based pipeline as fallback;
+- add provider-independent editor interfaces;
+- keep API keys in GitHub Actions secrets;
+- add cost and token controls;
+- add deterministic offline tests with mocked providers.
