@@ -183,6 +183,11 @@ def _process_and_write_ranked_articles(
             config.profile,
             generated_at=ranking_result.evaluated_at,
             project_name=str(config.settings["project"]["name"]),
+            epub_href=(
+                "digest.epub"
+                if features.get("render_epub", False)
+                else None
+            ),
         )
         _write_text_atomic(html_path, html_content)
         rendering_summary["html"] = {
