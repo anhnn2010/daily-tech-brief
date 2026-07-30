@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -48,7 +49,7 @@ def make_config(tmp_path: Path) -> ProjectConfig:
         settings={
             "project": {
                 "name": "Daily Tech Brief",
-                "version": "0.6.0",
+                "version": "0.7.0",
             },
             "runtime": {
                 "output_dir": str(tmp_path / "output"),
@@ -57,7 +58,7 @@ def make_config(tmp_path: Path) -> ProjectConfig:
                 "request_timeout_seconds": 20,
                 "max_articles": 1,
                 "max_summary_chars": 2000,
-                "user_agent": "DailyTechBrief/0.6.0",
+                "user_agent": "DailyTechBrief/0.7.0",
                 "fail_on_source_error": False,
             },
             "features": {
@@ -65,9 +66,9 @@ def make_config(tmp_path: Path) -> ProjectConfig:
                 "ranking": True,
                 "render_markdown": True,
                 "render_html": True,
+                "render_epub": True,
                 "build_site": True,
                 "ai_editor": False,
-                "epub": False,
             },
         },
     )
@@ -116,7 +117,7 @@ def make_collection_result() -> CollectionResult:
     )
 
 
-def test_main_builds_complete_static_site(
+def test_main_builds_complete_static_site_with_epub(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -143,11 +144,16 @@ def test_main_builds_complete_static_site(
     output_dir = tmp_path / "output"
     site_dir = tmp_path / "site"
 
-    assert (output_dir / "raw_articles.json").is_file()
-    assert (output_dir / "source_report.json").is_file()
-    assert (output_dir / "ranked_articles.json").is_file()
-    assert (output_dir / "digest.md").is_file()
-    assert (output_dir / "digest.html").is_file()
+    expected_output_files = (
+        "raw_articles.json",
+        "source_report.json",
+        "ranked_articles.json",
+        "digest.md",
+        "digest.html",
+        "digest.epub",
+    )
+    for filename in expected_output_files:
+        assert (output_dir / filename).is_file()
 
     assert (site_dir / "index.html").is_file()
     assert (site_dir / "latest" / "index.html").is_file()
@@ -170,13 +176,48 @@ def test_main_builds_complete_static_site(
 
     assert (archive_dir / "index.html").is_file()
     assert (archive_dir / "digest.md").is_file()
+    assert (archive_dir / "digest.epub").is_file()
     assert (archive_dir / "ranked_articles.json").is_file()
     assert (archive_dir / "source_report.json").is_file()
 
-    assert site_metadata["project"]["version"] == "0.6.0"
+    output_epub = output_dir / "digest.epub"
+    published_epubs = (
+        site_dir / "digest.epub",
+        site_dir / "latest" / "digest.epub",
+        archive_dir / "digest.epub",
+    )
+    for published_epub in published_epubs:
+        assert published_epub.is_file()
+        assert published_epub.read_bytes() == output_epub.read_bytes()
+
+    with zipfile.ZipFile(output_epub) as epub_archive:
+        assert epub_archive.read("mimetype") == b"application/epub+zip"
+        assert "EPUB/nav.xhtml" in epub_archive.namelist()
+        assert "EPUB/category-linux.xhtml" in epub_archive.namelist()
+        chapter = epub_archive.read("EPUB/category-linux.xhtml").decode(
+            "utf-8"
+        )
+        assert "Arch Linux workflow update" in chapter
+        assert "Read the original article" in chapter
+
+    rendering = execution_summary["processing"]["rendering"]
+    epub_summary = rendering["epub"]
+    assert epub_summary["enabled"] is True
+    assert epub_summary["path"] == str(output_epub)
+    assert epub_summary["article_count"] == 1
+    assert epub_summary["size_bytes"] == output_epub.stat().st_size
+    assert str(output_epub) in execution_summary["output_paths"]
+
+    assert site_metadata["project"]["version"] == "0.7.0"
     assert site_metadata["article_count"] == 1
-    assert execution_summary["publishing"]["site"]["archive_date"] == archive_date
-    assert execution_summary["publishing"]["site"]["article_count"] == 1
+    site_summary = execution_summary["publishing"]["site"]
+    assert site_summary["archive_date"] == archive_date
+    assert site_summary["article_count"] == 1
+    assert str(site_dir / "digest.epub") in site_summary["copied_files"]
+    assert str(site_dir / "latest" / "digest.epub") in site_summary[
+        "copied_files"
+    ]
+    assert str(archive_dir / "digest.epub") in site_summary["copied_files"]
 
     latest_html = (site_dir / "index.html").read_text(encoding="utf-8")
     assert "Arch Linux workflow update" in latest_html
