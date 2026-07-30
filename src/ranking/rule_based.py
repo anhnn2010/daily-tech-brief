@@ -130,8 +130,13 @@ def _rank_article(
     score += category_score
     reasons.append(f"Category weight {category_weight}: +{category_score}")
 
-    freshness_hours = _calculate_freshness_hours(article, evaluated_at)
-    freshness_score, freshness_reason = _score_freshness(freshness_hours)
+    freshness_seconds = _calculate_freshness_seconds(article, evaluated_at)
+    freshness_score, freshness_reason = _score_freshness(freshness_seconds)
+    freshness_hours = (
+        round(freshness_seconds / 3600, 3)
+        if freshness_seconds is not None
+        else None
+    )
     score += freshness_score
     if freshness_reason is not None:
         reasons.append(freshness_reason)
@@ -191,23 +196,25 @@ def _rank_article(
     )
 
 
-def _score_freshness(freshness_hours: float | None) -> tuple[int, str | None]:
-    if freshness_hours is None:
+def _score_freshness(
+    freshness_seconds: float | None,
+) -> tuple[int, str | None]:
+    if freshness_seconds is None:
         return 0, None
-    if freshness_hours <= 6:
+    if freshness_seconds <= 6 * 3600:
         return 10, "Published within 6 hours: +10"
-    if freshness_hours <= 12:
+    if freshness_seconds <= 12 * 3600:
         return 8, "Published within 12 hours: +8"
-    if freshness_hours <= 24:
+    if freshness_seconds <= 24 * 3600:
         return 6, "Published within 24 hours: +6"
-    if freshness_hours <= 36:
+    if freshness_seconds <= 36 * 3600:
         return 4, "Published within 36 hours: +4"
-    if freshness_hours <= 48:
+    if freshness_seconds <= 48 * 3600:
         return 2, "Published within 48 hours: +2"
     return 0, None
 
 
-def _calculate_freshness_hours(
+def _calculate_freshness_seconds(
     article: Article,
     evaluated_at: datetime,
 ) -> float | None:
@@ -216,7 +223,7 @@ def _calculate_freshness_hours(
         return None
 
     age_seconds = (evaluated_at - article_datetime).total_seconds()
-    return round(max(age_seconds, 0.0) / 3600, 3)
+    return max(age_seconds, 0.0)
 
 
 def _resolve_article_datetime(article: Article) -> datetime | None:
