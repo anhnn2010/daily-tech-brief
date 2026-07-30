@@ -1,8 +1,8 @@
 # Daily Tech Brief
 
-Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, selecting, rendering, and automating technology digests from RSS and Atom feeds.
+Daily Tech Brief is a personalized technology news pipeline for collecting, filtering, deduplicating, ranking, selecting, rendering, publishing, and automating technology digests from RSS and Atom feeds.
 
-Version **0.5.0** adds GitHub Actions automation on top of the v0.4.0 Markdown and HTML rendering pipeline.
+Version **0.6.0** adds static-site generation and GitHub Pages deployment on top of the v0.5.0 GitHub Actions workflow.
 
 ## Python version
 
@@ -29,23 +29,29 @@ ranked_articles.json
 digest.md
 digest.html
     ↓
+Static site builder
+    ↓
+site/
+    ↓
 GitHub Actions artifact
+GitHub Pages
 ```
 
-## Included in v0.5.0
+## Included in v0.6.0
 
-- Everything from v0.4.x
-- GitHub Actions workflow
-- Manual staging and production runs
-- Daily production schedule
-- GitHub Environments support
-- Python 3.12 on `ubuntu-24.04`
-- Configuration validation in CI
-- Offline test execution in CI
-- Digest generation in CI
-- Artifact upload
-- 14-day artifact retention
-- Workflow regression tests
+- Everything from v0.5.x
+- Static-site generation
+- Latest digest page
+- Dated archive pages
+- Archive index in HTML and JSON
+- Site metadata
+- `.nojekyll`
+- Production archive restoration
+- Separate site artifact
+- Production-only GitHub Pages deployment
+- Staging remains artifact-only
+- GitHub Pages workflow tests
+- End-to-end site publishing integration tests
 
 ## Project structure
 
@@ -59,12 +65,15 @@ daily-tech-brief/
 │   ├── settings.yml
 │   └── sources.yml
 ├── output/
+├── site/
 ├── src/
 │   ├── filters/
 │   │   ├── deduplicate.py
 │   │   └── time_filter.py
 │   ├── providers/
 │   │   └── feed.py
+│   ├── publishing/
+│   │   └── site_builder.py
 │   ├── ranking/
 │   │   ├── rule_based.py
 │   │   └── selection.py
@@ -89,6 +98,8 @@ daily-tech-brief/
 │   ├── test_markdown_renderer.py
 │   ├── test_rendering_pipeline.py
 │   ├── test_rule_based_ranking.py
+│   ├── test_site_builder.py
+│   ├── test_site_pipeline.py
 │   └── test_time_filter.py
 ├── .gitignore
 ├── pyproject.toml
@@ -126,7 +137,7 @@ python -m src.main --validate-only --json
 
 ## Run locally
 
-Fetch and process all enabled sources:
+Fetch, process, render, and build the static site:
 
 ```bash
 python -m src.main
@@ -139,13 +150,13 @@ python -m src.main --source arch_linux_news
 python -m src.main --source arch_linux_news --source planet_kde
 ```
 
-Write outputs to another directory:
+Write generated data to another output directory:
 
 ```bash
 python -m src.main --output-dir output/debug
 ```
 
-## Generated outputs
+## Generated data output
 
 ```text
 output/
@@ -158,7 +169,7 @@ output/
 
 ### `raw_articles.json`
 
-Contains all normalized feed entries returned by successful sources.
+Contains all normalized entries returned by successful feed sources.
 
 ### `source_report.json`
 
@@ -191,26 +202,107 @@ A portable Markdown edition grouped by category.
 
 ### `digest.html`
 
-A standalone responsive HTML edition that can be opened locally or published later through GitHub Pages.
+A standalone responsive HTML edition.
 
-## Open the digest
+## Static site output
+
+The site builder creates:
+
+```text
+site/
+├── index.html
+├── digest.md
+├── ranked_articles.json
+├── source_report.json
+├── site.json
+├── .nojekyll
+│
+├── latest/
+│   ├── index.html
+│   ├── digest.md
+│   ├── ranked_articles.json
+│   └── source_report.json
+│
+└── archive/
+    ├── index.html
+    ├── index.json
+    └── YYYY/
+        └── MM/
+            └── DD/
+                ├── index.html
+                ├── digest.md
+                ├── ranked_articles.json
+                └── source_report.json
+```
+
+The local archive date is calculated using:
+
+```text
+Asia/Ho_Chi_Minh
+```
+
+## Static site URLs
+
+After GitHub Pages deployment, the site provides:
+
+```text
+/                         Latest edition
+/latest/                  Latest edition
+/archive/                 Archive index
+/archive/YYYY/MM/DD/      Dated edition
+/digest.md                Latest Markdown edition
+/ranked_articles.json     Latest ranked JSON
+/source_report.json       Latest source report
+/site.json                Site metadata
+```
+
+## Open the site locally
 
 Linux:
 
 ```bash
-xdg-open output/digest.html
+xdg-open site/index.html
 ```
 
-macOS:
+Open the archive:
 
 ```bash
-open output/digest.html
+xdg-open site/archive/index.html
 ```
 
-Windows PowerShell:
+Inspect the archive manifest:
 
-```powershell
-Start-Process output/digest.html
+```bash
+python -m json.tool site/archive/index.json
+```
+
+## Static-site configuration
+
+Static-site generation is controlled in:
+
+```text
+config/settings.yml
+```
+
+Current configuration:
+
+```yaml
+runtime:
+  output_dir: output
+  site_dir: site
+
+features:
+  ranking: true
+  render_markdown: true
+  render_html: true
+  build_site: true
+```
+
+Generated directories are ignored by Git:
+
+```gitignore
+output/
+site/
 ```
 
 ## GitHub Actions workflow
@@ -221,11 +313,12 @@ The workflow is stored at:
 .github/workflows/generate_digest.yml
 ```
 
-It uses:
+Runtime:
 
 ```text
-Runner:  ubuntu-24.04
-Python:  3.12
+Runner: ubuntu-24.04
+Python: 3.12
+Branch: master
 ```
 
 The workflow runs:
@@ -236,8 +329,11 @@ Checkout
 → Install dependencies
 → Validate configuration
 → Run tests
-→ Generate digest
-→ Upload artifact
+→ Restore production archive when available
+→ Generate digest and static site
+→ Upload data artifact
+→ Upload site artifact
+→ Deploy GitHub Pages for production
 ```
 
 ## Manual workflow runs
@@ -250,7 +346,7 @@ Actions
 → Run workflow
 ```
 
-Choose one environment:
+Choose:
 
 ```text
 staging
@@ -262,8 +358,6 @@ The default is:
 ```text
 staging
 ```
-
-Both environments currently run the same code and generate the same files. They are separated now so later versions can publish production output while staging remains artifact-only.
 
 ## Scheduled workflow
 
@@ -280,46 +374,77 @@ This runs at approximately:
 06:30 Asia/Ho_Chi_Minh
 ```
 
-Scheduled runs always use the `production` environment.
-
-GitHub Actions schedules use UTC and may start a little later during periods of high GitHub Actions load.
-
-## GitHub Environments
-
-Create the following repository environments:
+Scheduled runs always resolve to:
 
 ```text
-Settings
-→ Environments
-```
-
-Environment names:
-
-```text
-staging
 production
 ```
 
-No secrets are required in v0.5.0.
+GitHub Actions schedules use UTC and may start slightly later during periods of high load.
 
-Later versions may store environment-specific values such as:
+## Staging behavior
+
+Staging performs:
 
 ```text
-AI_API_KEY
-PUBLISH_TARGET
-RELEASE_CHANNEL
+Generate digest
+→ Build site
+→ Upload output artifact
+→ Upload site artifact
 ```
+
+Staging does **not**:
+
+- upload a GitHub Pages artifact;
+- deploy GitHub Pages;
+- replace the public website.
+
+Use staging for checking:
+
+- sources;
+- ranking;
+- layout;
+- archive structure;
+- workflow changes.
+
+## Production behavior
+
+Production performs:
+
+```text
+Restore previous production site artifact
+→ Generate current digest
+→ Merge current edition into archive
+→ Upload output artifact
+→ Upload site artifact
+→ Upload Pages artifact
+→ Deploy GitHub Pages
+```
+
+The production workflow restores the most recent unexpired site artifact named like:
+
+```text
+daily-tech-brief-site-production-<run-number>-<run-attempt>
+```
+
+This preserves dated archive editions between workflow runs.
+
+If no previous production artifact exists, the workflow starts a new archive.
 
 ## Workflow artifacts
 
-A successful run uploads an artifact named like:
+Each workflow run uploads two regular artifacts.
+
+### Data artifact
+
+Example:
 
 ```text
-daily-tech-brief-staging-12
-daily-tech-brief-production-13
+daily-tech-brief-staging-12-1
+daily-tech-brief-production-13-1
 ```
 
-The artifact contains:
+Contains:
 
 ```text
 raw_articles.json
@@ -329,79 +454,122 @@ digest.md
 digest.html
 ```
 
-Artifact retention:
+### Site artifact
+
+Example:
+
+```text
+daily-tech-brief-site-staging-12-1
+daily-tech-brief-site-production-13-1
+```
+
+Contains the complete `site/` directory.
+
+Regular artifacts are retained for:
 
 ```text
 14 days
 ```
 
-### Download through the GitHub website
+The Pages artifact is temporary and retained for one day.
+
+## GitHub Pages setup
+
+The repository must be public when using GitHub Pages on a GitHub Free account.
+
+Configure the publishing source:
 
 ```text
 Repository
-→ Actions
-→ Select a workflow run
-→ Artifacts
-→ Select the artifact
+→ Settings
+→ Pages
+→ Build and deployment
+→ Source
+→ GitHub Actions
 ```
 
-GitHub downloads the artifact as a ZIP file.
+The deploy job uses:
 
-GitHub Mobile may show workflow runs and logs without exposing the artifact download clearly. On a phone, open the workflow run in a web browser to download the artifact.
+```yaml
+permissions:
+  pages: write
+  id-token: write
+```
 
-## Staging and production behavior
-
-### Staging
-
-Use staging for:
-
-- testing source changes;
-- testing ranking changes;
-- checking layout changes;
-- checking workflow changes;
-- reviewing artifact output.
-
-Current behavior:
+And the environment:
 
 ```text
-Generate
-→ Upload artifact
+github-pages
 ```
 
-### Production
+## GitHub Pages URL
 
-Production is used by scheduled runs and can also be selected manually.
-
-Current behavior:
+For a repository named:
 
 ```text
-Generate
-→ Upload artifact
+daily-tech-brief
 ```
 
-Future behavior:
+the default URL normally follows:
 
 ```text
-Generate
-→ Upload artifact
-→ Publish GitHub Pages
-→ Create or update Release
+https://<username>.github.io/daily-tech-brief/
 ```
 
-Publishing is intentionally postponed until the workflow is stable.
+On mobile, open the URL once and save it as a browser bookmark.
 
-## Workflow concurrency
-
-Only one run per environment is kept active:
+The Pages URL is also available from:
 
 ```text
-staging
-production
+Repository
+→ Settings
+→ Pages
 ```
 
-When a newer run starts for the same environment, the older active run is cancelled.
+or from the successful:
 
-This avoids duplicate daily runs and unnecessary artifact generation.
+```text
+Deploy GitHub Pages
+```
+
+job.
+
+## Archive behavior
+
+The archive builder:
+
+- preserves previous archive entries;
+- adds the current local date;
+- replaces an existing edition for the same local date;
+- removes stale files from the replaced same-day directory;
+- sorts editions newest first;
+- writes both HTML and JSON indexes.
+
+Archive manifest:
+
+```text
+site/archive/index.json
+```
+
+Example:
+
+```json
+{
+  "schema_version": 1,
+  "timezone": "Asia/Ho_Chi_Minh",
+  "latest_date": "2026-07-30",
+  "edition_count": 2,
+  "editions": [
+    {
+      "date": "2026-07-30",
+      "generated_at": "2026-07-29T23:30:00Z",
+      "article_count": 12,
+      "path": "2026/07/30/",
+      "title": "Daily Tech Brief"
+    }
+  ]
+}
+```
 
 ## Run tests
 
@@ -409,25 +577,28 @@ This avoids duplicate daily runs and unnecessary artifact generation.
 python -m pytest -q
 ```
 
-The current suite contains **89 offline tests**.
+The current suite contains **104 offline tests**.
 
-The GitHub workflow tests verify that the workflow retains:
+The v0.6.0 tests cover:
 
-- manual trigger;
-- scheduled trigger;
-- `ubuntu-24.04`;
-- Python 3.12;
-- staging and production;
-- validation;
-- test execution;
-- digest generation;
-- artifact upload.
+- static-site directory generation;
+- latest edition;
+- archive creation;
+- local date conversion;
+- archive preservation;
+- same-day replacement;
+- optional files;
+- invalid metadata;
+- Pages workflow permissions;
+- production-only deployment;
+- Pages action versions;
+- end-to-end site publishing.
 
 ## Exit codes
 
 - `0`: configuration is valid and at least one requested source succeeded
 - `1`: every requested source failed, or source errors are fatal
-- `2`: invalid configuration, invalid source selection, or processing error
+- `2`: invalid configuration, invalid source selection, rendering error, or publishing error
 
 By default:
 
@@ -435,32 +606,34 @@ By default:
 fail_on_source_error: false
 ```
 
-A failed source is recorded without stopping successful sources.
+Individual source failures remain isolated.
 
-## v0.5.0 acceptance criteria
+## v0.6.0 acceptance criteria
 
 - Local configuration validation succeeds.
-- All 89 tests pass.
-- The workflow appears in the GitHub Actions tab.
-- A manual staging run completes successfully.
-- A manual production run completes successfully.
-- The workflow uses Python 3.12 on `ubuntu-24.04`.
-- The workflow creates all five output files.
-- The artifact can be downloaded from the workflow run page.
-- Scheduled runs resolve to the production environment.
-- Staging and production use the same workflow and source code.
-- No GitHub Pages or Release publishing occurs yet.
+- All 104 tests pass.
+- Local execution creates both `output/` and `site/`.
+- `site/index.html` opens correctly.
+- `site/archive/index.html` opens correctly.
+- Archive dates use `Asia/Ho_Chi_Minh`.
+- A staging workflow run uploads two regular artifacts.
+- Staging does not deploy Pages.
+- A production workflow run restores the prior site artifact when available.
+- Production uploads a Pages artifact.
+- Production deploys through the `github-pages` environment.
+- The public Pages URL loads the latest digest.
+- A second production run preserves the previous archive edition.
 
 ## Next version
 
-**v0.6.0 — GitHub Pages Publishing**
+**v0.7.0 — EPUB and TTS**
 
 Planned work:
 
-- Prepare a static site directory.
-- Publish `digest.html` as the latest edition.
-- Keep dated HTML archives.
-- Add a simple archive index.
-- Publish only from production.
-- Keep staging artifact-only.
-- Add Pages deployment tests.
+- Generate `digest.epub`.
+- Add EPUB metadata and navigation.
+- Create a TTS-friendly reading structure.
+- Avoid reading long URLs aloud.
+- Support Readest and KOReader.
+- Add EPUB validation and renderer tests.
+- Upload EPUB in workflow artifacts.
