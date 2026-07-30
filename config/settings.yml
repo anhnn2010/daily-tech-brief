@@ -2,7 +2,7 @@ schema_version: 1
 
 project:
   name: Daily Tech Brief
-  version: 0.6.0
+  version: 0.7.0
 
 runtime:
   output_dir: output
@@ -11,7 +11,7 @@ runtime:
   request_timeout_seconds: 20
   max_articles: 12
   max_summary_chars: 2000
-  user_agent: DailyTechBrief/0.6.0
+  user_agent: DailyTechBrief/0.7.0
   fail_on_source_error: false
 
 features:
@@ -19,6 +19,6 @@ features:
   ranking: true
   render_markdown: true
   render_html: true
+  render_epub: true
   build_site: true
   ai_editor: false
-  epub: false
