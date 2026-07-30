@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from zipfile import ZipFile
 
 from src.config_loader import ProjectConfig
 from src.main import _process_and_write_ranked_articles
@@ -12,7 +13,15 @@ from src.models import Article
 NOW = datetime(2026, 7, 30, 4, 0, tzinfo=timezone.utc)
 
 
-def make_config() -> ProjectConfig:
+def make_config(*, render_epub: bool | None = True) -> ProjectConfig:
+    features: dict[str, bool] = {
+        "ranking": True,
+        "render_markdown": True,
+        "render_html": True,
+    }
+    if render_epub is not None:
+        features["render_epub"] = render_epub
+
     return ProjectConfig(
         sources=(),
         profile={
@@ -41,17 +50,13 @@ def make_config() -> ProjectConfig:
         settings={
             "project": {
                 "name": "Daily Tech Brief",
-                "version": "0.4.0",
+                "version": "0.7.0",
             },
             "runtime": {
                 "lookback_hours": 48,
                 "max_articles": 2,
             },
-            "features": {
-                "ranking": True,
-                "render_markdown": True,
-                "render_html": True,
-            },
+            "features": features,
         },
     )
 
@@ -81,10 +86,8 @@ def make_article(
     )
 
 
-def test_processing_pipeline_writes_markdown_and_html_digests(
-    tmp_path: Path,
-) -> None:
-    articles = (
+def make_articles() -> tuple[Article, ...]:
+    return (
         make_article(
             title="Arch Linux release update",
             category="linux",
@@ -101,20 +104,28 @@ def test_processing_pipeline_writes_markdown_and_html_digests(
         ),
     )
 
+
+def test_processing_pipeline_writes_markdown_html_and_epub_digests(
+    tmp_path: Path,
+) -> None:
     ranked_path, summary = _process_and_write_ranked_articles(
         config=make_config(),
-        articles=articles,
+        articles=make_articles(),
         output_dir=tmp_path,
         now=NOW,
     )
 
     markdown_path = tmp_path / "digest.md"
     html_path = tmp_path / "digest.html"
+    epub_path = tmp_path / "digest.epub"
 
     assert ranked_path.exists()
     assert markdown_path.exists()
     assert html_path.exists()
+    assert epub_path.exists()
 
+    epub_size = epub_path.stat().st_size
+    assert epub_size > 0
     assert summary["rendering"] == {
         "markdown": {
             "enabled": True,
@@ -125,6 +136,12 @@ def test_processing_pipeline_writes_markdown_and_html_digests(
             "enabled": True,
             "path": str(html_path),
             "article_count": 2,
+        },
+        "epub": {
+            "enabled": True,
+            "path": str(epub_path),
+            "article_count": 2,
+            "size_bytes": epub_size,
         },
     }
 
@@ -142,7 +159,51 @@ def test_processing_pipeline_writes_markdown_and_html_digests(
     assert "Arch Linux release update" in html
     assert "Pytest workflow improvements" in html
 
+    with ZipFile(epub_path) as epub:
+        assert epub.read("mimetype") == b"application/epub+zip"
+        assert "EPUB/category-linux.xhtml" in epub.namelist()
+        assert "EPUB/category-python.xhtml" in epub.namelist()
+
+        linux_chapter = epub.read("EPUB/category-linux.xhtml").decode("utf-8")
+        python_chapter = epub.read("EPUB/category-python.xhtml").decode("utf-8")
+        assert "Arch Linux release update" in linux_chapter
+        assert "Pytest workflow improvements" in python_chapter
+
     payload = json.loads(ranked_path.read_text(encoding="utf-8"))
-    assert payload["project"]["version"] == "0.4.0"
+    assert payload["project"]["version"] == "0.7.0"
     assert payload["summary"]["rendering"] == summary["rendering"]
     assert payload["article_count"] == 2
+
+
+def test_processing_pipeline_skips_epub_when_disabled(
+    tmp_path: Path,
+) -> None:
+    ranked_path, summary = _process_and_write_ranked_articles(
+        config=make_config(render_epub=False),
+        articles=make_articles(),
+        output_dir=tmp_path,
+        now=NOW,
+    )
+
+    assert not (tmp_path / "digest.epub").exists()
+    assert summary["rendering"]["epub"] == {"enabled": False}
+
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    assert payload["summary"]["rendering"]["epub"] == {"enabled": False}
+
+
+def test_processing_pipeline_keeps_legacy_summary_without_epub_setting(
+    tmp_path: Path,
+) -> None:
+    ranked_path, summary = _process_and_write_ranked_articles(
+        config=make_config(render_epub=None),
+        articles=make_articles(),
+        output_dir=tmp_path,
+        now=NOW,
+    )
+
+    assert not (tmp_path / "digest.epub").exists()
+    assert "epub" not in summary["rendering"]
+
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    assert "epub" not in payload["summary"]["rendering"]
