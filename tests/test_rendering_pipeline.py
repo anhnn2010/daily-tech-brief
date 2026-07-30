@@ -158,6 +158,9 @@ def test_processing_pipeline_writes_markdown_html_and_epub_digests(
     assert '<section class="category-section" id="python">' in html
     assert "Arch Linux release update" in html
     assert "Pytest workflow improvements" in html
+    assert 'class="download-link"' in html
+    assert 'href="digest.epub"' in html
+    assert "Download EPUB" in html
 
     with ZipFile(epub_path) as epub:
         assert epub.read("mimetype") == b"application/epub+zip"
@@ -188,6 +191,11 @@ def test_processing_pipeline_skips_epub_when_disabled(
     assert not (tmp_path / "digest.epub").exists()
     assert summary["rendering"]["epub"] == {"enabled": False}
 
+    html = (tmp_path / "digest.html").read_text(encoding="utf-8")
+    assert "Download EPUB" not in html
+    assert 'href="digest.epub"' not in html
+    assert 'class="edition-actions"' not in html
+
     payload = json.loads(ranked_path.read_text(encoding="utf-8"))
     assert payload["summary"]["rendering"]["epub"] == {"enabled": False}
 
@@ -204,6 +212,11 @@ def test_processing_pipeline_keeps_legacy_summary_without_epub_setting(
 
     assert not (tmp_path / "digest.epub").exists()
     assert "epub" not in summary["rendering"]
+
+    html = (tmp_path / "digest.html").read_text(encoding="utf-8")
+    assert "Download EPUB" not in html
+    assert 'href="digest.epub"' not in html
+    assert 'class="edition-actions"' not in html
 
     payload = json.loads(ranked_path.read_text(encoding="utf-8"))
     assert "epub" not in payload["summary"]["rendering"]
