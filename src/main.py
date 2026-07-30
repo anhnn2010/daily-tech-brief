@@ -14,6 +14,7 @@ from src.filters.deduplicate import deduplicate_articles
 from src.filters.time_filter import filter_articles_by_time
 from src.models import Article, ConfigError, Source
 from src.ranking.rule_based import rank_articles
+from src.ranking.selection import select_articles_by_category_quota
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -133,7 +134,12 @@ def _process_and_write_ranked_articles(
     )
 
     max_articles = int(runtime["max_articles"])
-    selected_articles = ranking_result.articles[:max_articles]
+    selection_result = select_articles_by_category_quota(
+        ranking_result.articles,
+        config.profile,
+        max_articles=max_articles,
+    )
+    selected_articles = selection_result.articles
     ranked_articles_path = output_dir / "ranked_articles.json"
 
     processing_summary: dict[str, Any] = {
@@ -143,6 +149,7 @@ def _process_and_write_ranked_articles(
         "time_filter": time_result.summary(),
         "deduplication": deduplication_result.summary(),
         "ranking": ranking_result.summary(),
+        "selection": selection_result.summary(),
         "selected_articles": len(selected_articles),
     }
     payload = {
@@ -186,6 +193,30 @@ def _print_execution_summary(summary: dict[str, Any]) -> None:
         print(f"Articles within lookback: {time_filter['kept_articles']}")
         print(f"Unique articles:          {deduplication['unique_articles']}")
         print(f"Selected articles:        {processing['selected_articles']}")
+
+        selection = processing.get("selection")
+        if isinstance(selection, dict):
+            print(
+                "Selected within quota:    "
+                f"{selection['selected_within_quota']}"
+            )
+            print(
+                "Selected from overflow:   "
+                f"{selection['selected_from_overflow']}"
+            )
+
+            category_counts = selection.get("category_counts", {})
+            if isinstance(category_counts, dict):
+                selected_categories = [
+                    f"{category}={count}"
+                    for category, count in sorted(category_counts.items())
+                    if int(count) > 0
+                ]
+                if selected_categories:
+                    print(
+                        "Selected by category:    "
+                        + ", ".join(selected_categories)
+                    )
 
     print("\nOutput:")
     for path in summary["output_paths"]:
