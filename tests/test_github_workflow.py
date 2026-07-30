@@ -78,6 +78,40 @@ def test_production_restores_previous_site_archive() -> None:
     assert "find site/archive" in workflow
 
 
+def test_workflow_verifies_epub_publication() -> None:
+    workflow = read_workflow()
+
+    assert "name: Verify EPUB publication" in workflow
+    assert "test -s output/digest.epub" in workflow
+    assert "test -s site/digest.epub" in workflow
+    assert "test -s site/latest/digest.epub" in workflow
+    assert "-path '*/digest.epub'" in workflow
+    assert "-exec cmp -s output/digest.epub {} \\;" in workflow
+    assert "cmp output/digest.epub site/digest.epub" in workflow
+    assert "cmp output/digest.epub site/latest/digest.epub" in workflow
+    assert 'grep -q \'href="digest.epub"\' site/index.html' in workflow
+    assert "grep -q 'Download EPUB' site/index.html" in workflow
+
+
+def test_epub_verification_runs_before_artifact_uploads() -> None:
+    workflow = read_workflow()
+
+    verify_position = workflow.index("- name: Verify EPUB publication")
+    output_upload_position = workflow.index(
+        "- name: Upload digest output artifact"
+    )
+    site_upload_position = workflow.index(
+        "- name: Upload static site artifact"
+    )
+    pages_upload_position = workflow.index(
+        "- name: Upload GitHub Pages artifact"
+    )
+
+    assert verify_position < output_upload_position
+    assert verify_position < site_upload_position
+    assert verify_position < pages_upload_position
+
+
 def test_pages_artifact_is_uploaded_only_for_production() -> None:
     workflow = read_workflow()
 
