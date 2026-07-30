@@ -161,6 +161,36 @@ jobs:
       - name: Generate digest and static site
         run: python -m src.main
 
+      - name: Verify EPUB publication
+        shell: bash
+        run: |
+          test -s output/digest.epub
+          test -s site/digest.epub
+          test -s site/latest/digest.epub
+
+          archive_epub="$(
+            find site/archive \
+              -type f \
+              -path '*/digest.epub' \
+              -exec cmp -s output/digest.epub {} \; \
+              -print \
+              -quit
+          )"
+
+          if [[ -z "${archive_epub}" ]]; then
+            echo "No archived EPUB was generated." >&2
+            exit 1
+          fi
+
+          cmp output/digest.epub site/digest.epub
+          cmp output/digest.epub site/latest/digest.epub
+          cmp output/digest.epub "${archive_epub}"
+
+          grep -q 'href="digest.epub"' site/index.html
+          grep -q 'Download EPUB' site/index.html
+
+          echo "Verified EPUB: ${archive_epub}"
+
       - name: List generated outputs
         run: |
           echo "Generated output files:"
