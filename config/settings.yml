@@ -17,6 +17,6 @@ features:
   fetch_feeds: true
   ranking: true
   render_markdown: true
-  render_html: false
+  render_html: true
   ai_editor: false
   epub: false
