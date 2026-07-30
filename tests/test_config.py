@@ -15,10 +15,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def test_bundled_configuration_is_valid() -> None:
     config = load_project_config(PROJECT_ROOT / "config")
+    sources_by_id = {source.id: source for source in config.sources}
 
-    assert len(config.sources) == 17
+    assert len(config.sources) == 18
     assert len(config.enabled_sources) == 17
     assert all(source.official for source in config.sources)
+    assert sources_by_id["real_python"].enabled is False
+    assert sources_by_id["python_bytes"].enabled is True
 
 
 def test_source_ids_are_unique() -> None:
