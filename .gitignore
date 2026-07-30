@@ -30,6 +30,7 @@ dist/
 
 # Generated project output
 output/
+site/
 
 # Environment and secret files
 .env
