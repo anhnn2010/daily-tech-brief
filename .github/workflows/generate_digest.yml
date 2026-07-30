@@ -93,15 +93,19 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
-      - name: Generate digest
+      - name: Generate digest and static site
         run: python -m src.main
 
       - name: List generated outputs
         run: |
-          echo "Generated files:"
+          echo "Generated output files:"
           find output -maxdepth 1 -type f -printf '%f\n' | sort
 
-      - name: Upload digest artifact
+          echo
+          echo "Generated site files:"
+          find site -type f -printf '%P\n' | sort
+
+      - name: Upload digest output artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -112,3 +116,16 @@ jobs:
           path: output/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Upload static site artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            daily-tech-brief-site-${{
+              env.TARGET_ENVIRONMENT
+            }}-${{ github.run_number }}
+          path: site/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
