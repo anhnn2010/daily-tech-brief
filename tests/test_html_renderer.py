@@ -86,7 +86,42 @@ def test_renderer_creates_standalone_responsive_html() -> None:
     assert "@media print" in html
     assert "<script" not in html
     assert "https://cdn" not in html
+    assert "Download EPUB" not in html
+    assert 'class="edition-actions"' not in html
 
+
+
+def test_renderer_adds_relative_epub_download_action() -> None:
+    html = render_html_digest(
+        [make_ranked_article()],
+        make_profile(),
+        generated_at="2026-07-30T04:00:00Z",
+        epub_href="digest.epub",
+    )
+
+    assert '<p class="edition-actions">' in html
+    assert (
+        '<a class="download-link" href="digest.epub" download>'
+        in html
+    )
+    assert "Download EPUB" in html
+    assert "min-height: 42px" in html
+    assert ".category-nav, .edition-actions { display: none; }" in html
+
+
+def test_renderer_escapes_epub_download_href() -> None:
+    html = render_html_digest(
+        [make_ranked_article()],
+        make_profile(),
+        generated_at="2026-07-30T04:00:00Z",
+        epub_href='digest.epub?edition=1&name="daily"',
+    )
+
+    assert (
+        'href="digest.epub?edition=1&amp;name=&quot;daily&quot;"'
+        in html
+    )
+    assert 'href="digest.epub?edition=1&name="daily""' not in html
 
 def test_renderer_groups_articles_in_profile_category_order() -> None:
     html = render_html_digest(
@@ -239,6 +274,18 @@ def test_renderer_handles_empty_digest() -> None:
     [
         ({"project_name": "   "}, "project_name must be a non-empty string"),
         ({"include_scores": "yes"}, "include_scores must be a boolean"),
+        (
+            {"epub_href": ""},
+            "epub_href must be None or a non-empty string",
+        ),
+        (
+            {"epub_href": "   "},
+            "epub_href must be None or a non-empty string",
+        ),
+        (
+            {"epub_href": 123},
+            "epub_href must be None or a non-empty string",
+        ),
         ({"generated_at": "invalid"}, "generated_at must be a valid ISO datetime"),
     ],
 )
