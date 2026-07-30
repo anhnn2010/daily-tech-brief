@@ -15,6 +15,7 @@ from src.filters.time_filter import filter_articles_by_time
 from src.models import Article, ConfigError, Source
 from src.ranking.rule_based import rank_articles
 from src.ranking.selection import select_articles_by_category_quota
+from src.renderers.html import render_html_digest
 from src.renderers.markdown import render_markdown_digest
 
 
@@ -153,6 +154,44 @@ def _process_and_write_ranked_articles(
         "selection": selection_result.summary(),
         "selected_articles": len(selected_articles),
     }
+    features = config.settings["features"]
+    rendering_summary: dict[str, dict[str, Any]] = {}
+
+    if features.get("render_markdown", False):
+        markdown_path = output_dir / "digest.md"
+        markdown_content = render_markdown_digest(
+            selected_articles,
+            config.profile,
+            generated_at=ranking_result.evaluated_at,
+            project_name=str(config.settings["project"]["name"]),
+        )
+        _write_text_atomic(markdown_path, markdown_content)
+        rendering_summary["markdown"] = {
+            "enabled": True,
+            "path": str(markdown_path),
+            "article_count": len(selected_articles),
+        }
+    else:
+        rendering_summary["markdown"] = {"enabled": False}
+
+    if features.get("render_html", False):
+        html_path = output_dir / "digest.html"
+        html_content = render_html_digest(
+            selected_articles,
+            config.profile,
+            generated_at=ranking_result.evaluated_at,
+            project_name=str(config.settings["project"]["name"]),
+        )
+        _write_text_atomic(html_path, html_content)
+        rendering_summary["html"] = {
+            "enabled": True,
+            "path": str(html_path),
+            "article_count": len(selected_articles),
+        }
+    else:
+        rendering_summary["html"] = {"enabled": False}
+
+    processing_summary["rendering"] = rendering_summary
     payload = {
         "schema_version": 1,
         "project": config.settings["project"],
@@ -162,29 +201,6 @@ def _process_and_write_ranked_articles(
         "articles": [article.to_dict() for article in selected_articles],
     }
     _write_json_atomic(ranked_articles_path, payload)
-
-    if config.settings["features"].get("render_markdown", False):
-        markdown_path = output_dir / "digest.md"
-        markdown_content = render_markdown_digest(
-            selected_articles,
-            config.profile,
-            generated_at=ranking_result.evaluated_at,
-            project_name=str(config.settings["project"]["name"]),
-        )
-        _write_text_atomic(markdown_path, markdown_content)
-        processing_summary["rendering"] = {
-            "markdown": {
-                "enabled": True,
-                "path": str(markdown_path),
-                "article_count": len(selected_articles),
-            }
-        }
-    else:
-        processing_summary["rendering"] = {
-            "markdown": {
-                "enabled": False,
-            }
-        }
 
     return ranked_articles_path, processing_summary
 
@@ -307,13 +323,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         rendering = processing_summary.get("rendering", {})
         if isinstance(rendering, dict):
-            markdown_rendering = rendering.get("markdown")
-            if (
-                isinstance(markdown_rendering, dict)
-                and markdown_rendering.get("enabled")
-                and isinstance(markdown_rendering.get("path"), str)
-            ):
-                output_paths.append(markdown_rendering["path"])
+            for renderer_name in ("markdown", "html"):
+                renderer_summary = rendering.get(renderer_name)
+                if (
+                    isinstance(renderer_summary, dict)
+                    and renderer_summary.get("enabled")
+                    and isinstance(renderer_summary.get("path"), str)
+                ):
+                    output_paths.append(renderer_summary["path"])
 
     summary["output_paths"] = output_paths
 
