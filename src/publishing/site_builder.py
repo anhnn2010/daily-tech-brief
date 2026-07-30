@@ -95,6 +95,7 @@ def build_static_site(
 
     public_files = {
         "digest_markdown": "digest.md",
+        "digest_epub": "digest.epub",
         "ranked_articles": "ranked_articles.json",
         "source_report": "source_report.json",
     }
@@ -193,6 +194,7 @@ def _load_source_files(output_dir: Path) -> dict[str, Path | None]:
     }
     optional = {
         "digest_markdown": output_dir / "digest.md",
+        "digest_epub": output_dir / "digest.epub",
         "source_report": output_dir / "source_report.json",
     }
 
