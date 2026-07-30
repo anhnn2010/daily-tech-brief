@@ -13,6 +13,7 @@ from src.config_loader import ProjectConfig, load_project_config
 from src.filters.deduplicate import deduplicate_articles
 from src.filters.time_filter import filter_articles_by_time
 from src.models import Article, ConfigError, Source
+from src.publishing.site_builder import build_static_site
 from src.ranking.rule_based import rank_articles
 from src.ranking.selection import select_articles_by_category_quota
 from src.renderers.html import render_html_digest
@@ -331,6 +332,43 @@ def main(argv: Sequence[str] | None = None) -> int:
                     and isinstance(renderer_summary.get("path"), str)
                 ):
                     output_paths.append(renderer_summary["path"])
+
+    if config.settings["features"].get("build_site", False):
+        if not config.settings["features"].get("ranking", False):
+            print(
+                "Publishing error: features.build_site requires ranking",
+                file=sys.stderr,
+            )
+            return 2
+
+        site_dir = Path(
+            str(config.settings["runtime"].get("site_dir", "site"))
+        )
+        timezone_name = str(
+            config.profile["profile"].get("timezone", "UTC")
+        )
+
+        try:
+            site_result = build_static_site(
+                output_dir=output_dir,
+                site_dir=site_dir,
+                timezone_name=timezone_name,
+            )
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            print(f"Publishing error: {exc}", file=sys.stderr)
+            return 2
+
+        summary["publishing"] = {
+            "site": site_result.summary(),
+        }
+        output_paths.extend(
+            [
+                str(site_result.index_path),
+                str(site_result.archive_index_path),
+                str(site_result.archive_manifest_path),
+                str(site_result.site_dir / "site.json"),
+            ]
+        )
 
     summary["output_paths"] = output_paths
 
