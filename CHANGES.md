@@ -1,13 +1,15 @@
-# Daily Tech Brief v0.3.0
+# Daily Tech Brief v0.4.0
 
 ## Summary
 
-Version 0.3.0 upgrades Daily Tech Brief from a raw RSS/Atom collector into a personalized, explainable article-selection pipeline.
+Version 0.4.0 adds readable Markdown and standalone HTML rendering to the Daily Tech Brief pipeline.
 
-The processing flow is now:
+The complete flow is now:
 
 ```text
 RSS / Atom feeds
+    ↓
+Collection
     ↓
 Time filtering
     ↓
@@ -18,135 +20,82 @@ Rule-based ranking
 Category quota selection
     ↓
 ranked_articles.json
+    ↓
+digest.md
+digest.html
 ```
 
 ## Added
 
-### Time filtering
+### Markdown renderer
 
 Added:
 
 ```text
-src/filters/time_filter.py
-tests/test_time_filter.py
+src/renderers/markdown.py
+tests/test_markdown_renderer.py
 ```
 
 Capabilities:
 
-- Filter articles using the configured lookback window.
-- Use `published_at` as the primary timestamp.
-- Fall back to `updated_at` when needed.
-- Treat timezone-less timestamps as UTC.
-- Keep articles exactly on the cutoff boundary.
-- Allow a small future-time tolerance for clock differences.
-- Report old, future, missing-date, and invalid-date articles separately.
+- Group selected articles by category.
+- Preserve category order from `config/profile.yml`.
+- Omit categories with no selected articles.
+- Render linked article titles.
+- Display source, publication time, score, summary, and matched interests.
+- Convert timestamps to the configured local timezone.
+- Escape Markdown-sensitive characters.
+- Handle missing summaries and invalid article dates.
+- Render a readable empty state when no articles are selected.
+- Avoid external dependencies.
 
-### URL deduplication
+### HTML renderer
 
 Added:
 
 ```text
-src/filters/deduplicate.py
-tests/test_deduplicate.py
+src/renderers/html.py
+tests/test_html_renderer.py
 ```
 
 Capabilities:
 
-- Normalize URL scheme and hostname.
-- Remove URL fragments.
-- Remove trailing slashes where appropriate.
-- Remove common tracking parameters:
-  - `utm_*`
-  - `fbclid`
-  - `gclid`
-  - `msclkid`
-  - `mc_cid`
-  - `mc_eid`
-- Preserve meaningful query parameters.
-- Sort query parameters consistently.
-- Detect equivalent URLs.
-- Keep the most complete article record.
-- Report duplicate groups and invalid URLs.
+- Generate a complete standalone HTML document.
+- Work without JavaScript, external CSS, fonts, images, or CDNs.
+- Use responsive layouts for desktop and mobile.
+- Support automatic light and dark mode.
+- Provide print-friendly styles.
+- Group articles by category.
+- Add category navigation links.
+- Display source, local publication time, score, summary, and matched interests.
+- Escape feed content and URLs safely.
+- Omit empty categories.
+- Render a readable empty state.
+- Support future GitHub Pages publishing without another build system.
 
-### Rule-based ranking
+### Rendering integration test
 
 Added:
 
 ```text
-src/ranking/rule_based.py
-tests/test_rule_based_ranking.py
+tests/test_rendering_pipeline.py
 ```
 
-Ranking signals:
-
-- Source priority.
-- Category weight.
-- Article freshness.
-- High-priority keyword matches.
-- Low-priority keyword penalties.
-
-Each ranked article includes:
-
-- total score;
-- category weight;
-- freshness in hours;
-- matched high-priority keywords;
-- matched low-priority keywords;
-- human-readable score reasons.
-
-### Category quota selection
-
-Added:
+The integration test confirms that one pipeline run creates:
 
 ```text
-src/ranking/selection.py
-tests/test_article_selection.py
+ranked_articles.json
+digest.md
+digest.html
 ```
 
-Capabilities:
+It also verifies that:
 
-- Select articles using per-category daily quotas.
-- Use soft quotas to improve category balance.
-- Fill unused slots with the highest-ranked remaining articles.
-- Exclude categories with `daily_quota: 0`.
-- Preserve the original ranking order.
-- Report selected and deferred article counts.
-
-### Pipeline integration test
-
-Added:
-
-```text
-tests/test_main_pipeline.py
-```
-
-The integration test covers:
-
-- time filtering;
-- duplicate URL detection;
-- invalid URL removal;
-- best duplicate-record selection;
-- ranking;
-- category quota selection;
-- `ranked_articles.json` generation.
-
-### Generated ranked output
-
-Added:
-
-```text
-output/ranked_articles.json
-```
-
-The output contains:
-
-- project metadata;
-- generation timestamp;
-- time-filter summary;
-- deduplication summary;
-- ranking summary;
-- selection summary;
-- selected articles and score explanations.
+- the selected article count is consistent;
+- Markdown and HTML contain the selected articles;
+- category sections are rendered correctly;
+- rendering metadata is written to `ranked_articles.json`;
+- project metadata reports version `0.4.0`.
 
 ## Changed
 
@@ -158,23 +107,49 @@ Updated:
 src/main.py
 ```
 
-The application now processes collected articles through:
+The pipeline now supports two independent rendering feature flags:
 
-```text
-Time filter
-→ Deduplicate
-→ Rank
-→ Category selection
+```yaml
+features:
+  render_markdown: true
+  render_html: true
 ```
 
-New console summary fields:
+Rendering occurs after filtering, deduplication, ranking, and category selection.
 
-- articles within the lookback window;
-- unique articles;
-- selected articles;
-- selected within quota;
-- selected from overflow;
-- selected category distribution.
+The program now writes:
+
+```text
+output/digest.md
+output/digest.html
+```
+
+using atomic file replacement.
+
+### Rendering metadata
+
+`ranked_articles.json` now contains:
+
+```json
+{
+  "summary": {
+    "rendering": {
+      "markdown": {
+        "enabled": true,
+        "path": "output/digest.md",
+        "article_count": 12
+      },
+      "html": {
+        "enabled": true,
+        "path": "output/digest.html",
+        "article_count": 12
+      }
+    }
+  }
+}
+```
+
+The ranked JSON file is written after rendering metadata has been finalized.
 
 ### Runtime configuration
 
@@ -186,46 +161,21 @@ config/settings.yml
 
 Changes:
 
-- Project version updated to `0.3.0`.
-- Ranking enabled by default.
-- User-Agent version updated to `0.3.0`.
-- Maximum selected articles remains 12.
-- Lookback window remains 48 hours.
+- Project version updated to `0.4.0`.
+- User-Agent version updated to `0.4.0`.
+- Markdown rendering enabled by default.
+- HTML rendering enabled by default.
 
-### Personal profile
+Current rendering configuration:
 
-Updated:
-
-```text
-config/profile.yml
+```yaml
+features:
+  ranking: true
+  render_markdown: true
+  render_html: true
+  ai_editor: false
+  epub: false
 ```
-
-The category quotas now total 12:
-
-| Category | Daily quota |
-|---|---:|
-| AI | 2 |
-| Automation / CI | 2 |
-| Python | 1 |
-| Linux | 2 |
-| Open Source / Engineering | 1 |
-| Semiconductor | 2 |
-| Test Engineering | 1 |
-| Ebook | 1 |
-
-Added or refined keywords for:
-
-- GitHub Actions;
-- Jenkins;
-- JFrog and Artifactory;
-- Arch Linux and KDE;
-- Python automation and testing;
-- AI coding agents;
-- post-silicon validation;
-- semiconductor test;
-- SerDes and high-speed interconnect;
-- PyVISA, SCPI, and LXI;
-- KOReader, Calibre, EPUB, OCR, and TTS.
 
 ### Documentation
 
@@ -235,62 +185,62 @@ Updated:
 README.md
 ```
 
-The README now documents:
+The documentation now includes:
 
-- the v0.3.0 pipeline;
-- ranking rules;
-- category quotas;
-- generated outputs;
-- commands for inspecting selected articles;
-- runtime configuration;
-- acceptance criteria;
-- the v0.4.0 rendering plan.
+- the complete v0.4.0 pipeline;
+- generated Markdown and HTML files;
+- renderer directory structure;
+- commands for opening the HTML digest;
+- rendering feature flags;
+- rendering metadata;
+- standalone HTML characteristics;
+- updated acceptance criteria;
+- the GitHub Actions roadmap.
 
-### Git ignore rules
+## Generated outputs
 
-Added:
-
-```text
-.gitignore
-```
-
-Generated output, virtual environments, caches, IDE files, logs, and local secret files are excluded from Git.
-
-## Fixed
-
-### Source registry test
-
-Updated the configuration test after replacing the blocked Real Python feed with Python Bytes.
-
-Current registry:
+A successful run now produces:
 
 ```text
-Configured sources: 18
-Enabled sources:    17
+output/
+├── raw_articles.json
+├── source_report.json
+├── ranked_articles.json
+├── digest.md
+└── digest.html
 ```
 
-### Freshness score boundary
+### `digest.md`
 
-Fixed a boundary issue where an article older than 48 hours by one second could still receive the 48-hour freshness bonus because the value was rounded before scoring.
+A portable Markdown digest suitable for:
 
-Freshness scoring now uses exact seconds:
+- terminal viewing;
+- GitHub preview;
+- note-taking applications;
+- later EPUB generation.
 
-```text
-48 hours          → +2
-48 hours + 1 sec  → +0
-```
+### `digest.html`
+
+A responsive standalone page suitable for:
+
+- local browser viewing;
+- mobile reading;
+- printing or PDF export;
+- future GitHub Pages publishing.
 
 ## Compatibility notes
 
 - Minimum supported Python version: 3.11.
 - Recommended Python version: 3.12.
-- Tests do not require internet access.
-- Feed collection continues when individual sources fail.
-- `output/` is generated locally and is not committed.
+- No new runtime dependency is required.
+- Renderer tests are fully offline.
+- Existing JSON outputs remain available.
+- Rendering can be disabled independently through feature flags.
+- Generated files under `output/` remain excluded from Git.
 
 ## Validation
 
-Run configuration validation:
+Validate configuration:
 
 ```bash
 python -m src.main --validate-only
@@ -305,61 +255,81 @@ python -m pytest -q
 Expected result:
 
 ```text
-60 passed
+84 passed
 ```
 
-Run the complete pipeline:
+Run the full pipeline:
 
 ```bash
 python -m src.main
 ```
 
-Expected generated files:
+Expected output list:
 
 ```text
 output/raw_articles.json
 output/source_report.json
 output/ranked_articles.json
+output/digest.md
+output/digest.html
+```
+
+Open the HTML digest on Linux:
+
+```bash
+xdg-open output/digest.html
+```
+
+Inspect the Markdown digest:
+
+```bash
+less output/digest.md
 ```
 
 ## Acceptance criteria
 
-Version 0.3.0 is complete when:
+Version 0.4.0 is complete when:
 
 - configuration validation succeeds;
-- all 60 tests pass;
-- feeds can be collected successfully;
-- articles outside the lookback window are excluded;
-- equivalent URLs are deduplicated;
-- ranked articles contain explainable score reasons;
-- category quotas are applied;
+- all 84 tests pass;
+- feed collection completes with per-source error isolation;
+- article filtering, deduplication, ranking, and quota selection remain functional;
 - `ranked_articles.json` is generated;
-- selected articles are limited to the configured maximum.
+- `digest.md` is generated when Markdown rendering is enabled;
+- `digest.html` is generated when HTML rendering is enabled;
+- empty categories are omitted;
+- article content is escaped safely;
+- local timezone conversion is correct;
+- rendering metadata matches the generated files;
+- HTML opens correctly without external assets.
 
 ## Suggested commit
 
 ```bash
-git add CHANGES-v0.3.0.md
-git commit -m "Add v0.3.0 changelog"
+git add CHANGES-v0.4.0.md
+git commit -m "Add v0.4.0 changelog"
 ```
 
 ## Suggested tag
 
-After confirming the full pipeline and output:
+After confirming the complete pipeline:
 
 ```bash
-git tag -a v0.3.0 -m "Daily Tech Brief v0.3.0"
+git tag -a v0.4.0 -m "Daily Tech Brief v0.4.0"
 git push origin main
-git push origin v0.3.0
+git push origin v0.4.0
 ```
 
 ## Next version
 
-Version 0.4.0 will add digest rendering:
+Version 0.5.0 will add GitHub Actions automation:
 
-- `digest.md`;
-- `digest.html`;
-- category grouping;
-- readable daily brief templates;
-- original article links;
-- renderer unit tests.
+- run on `ubuntu-24.04`;
+- use Python 3.12;
+- support manual execution;
+- support scheduled execution;
+- validate configuration;
+- run the offline test suite;
+- generate JSON, Markdown, and HTML outputs;
+- upload generated files as a workflow artifact;
+- keep GitHub Pages and Releases disabled until the staging workflow is stable.
