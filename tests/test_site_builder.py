@@ -8,12 +8,18 @@ import pytest
 from src.publishing.site_builder import build_static_site
 
 
+EPUB_BYTES = b"PK\x03\x04sample epub payload"
+UPDATED_EPUB_BYTES = b"PK\x03\x04updated epub payload"
+
+
 def write_generated_output(
     output_dir: Path,
     *,
     generated_at: str = "2026-07-29T23:30:00Z",
     article_count: int = 3,
     include_optional_files: bool = True,
+    include_epub: bool = True,
+    epub_content: bytes = EPUB_BYTES,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -27,7 +33,7 @@ def write_generated_output(
                 "schema_version": 1,
                 "project": {
                     "name": "Daily Tech Brief",
-                    "version": "0.6.0",
+                    "version": "0.7.0",
                 },
                 "generated_at": generated_at,
                 "article_count": article_count,
@@ -46,6 +52,9 @@ def write_generated_output(
             json.dumps({"sources": []}),
             encoding="utf-8",
         )
+
+    if include_epub:
+        (output_dir / "digest.epub").write_bytes(epub_content)
 
 
 def read_json(path: Path) -> dict:
@@ -80,6 +89,15 @@ def test_build_static_site_creates_latest_and_local_date_archive(
     assert (site_dir / "digest.md").is_file()
     assert (site_dir / "latest" / "digest.md").is_file()
     assert (archive_dir / "digest.md").is_file()
+
+    epub_destinations = (
+        site_dir / "digest.epub",
+        site_dir / "latest" / "digest.epub",
+        archive_dir / "digest.epub",
+    )
+    for epub_path in epub_destinations:
+        assert epub_path.read_bytes() == EPUB_BYTES
+        assert epub_path in result.copied_files
 
     assert (site_dir / "ranked_articles.json").is_file()
     assert (site_dir / "source_report.json").is_file()
@@ -124,7 +142,7 @@ def test_build_static_site_writes_archive_manifest_and_metadata(
         }
     ]
 
-    assert metadata["project"]["version"] == "0.6.0"
+    assert metadata["project"]["version"] == "0.7.0"
     assert metadata["archive_date"] == "2026-07-30"
     assert metadata["latest_path"] == "latest/"
     assert metadata["archive_path"] == "archive/"
@@ -144,6 +162,8 @@ def test_build_static_site_preserves_existing_archive_entries(
         "Older edition",
         encoding="utf-8",
     )
+    old_epub = old_archive_dir / "digest.epub"
+    old_epub.write_bytes(b"older archived epub")
 
     archive_root = site_dir / "archive"
     (archive_root / "index.json").write_text(
@@ -180,6 +200,7 @@ def test_build_static_site_preserves_existing_archive_entries(
     assert (old_archive_dir / "index.html").read_text(
         encoding="utf-8"
     ) == "Older edition"
+    assert old_epub.read_bytes() == b"older archived epub"
     assert manifest["edition_count"] == 2
     assert [
         edition["date"] for edition in manifest["editions"]
@@ -218,6 +239,7 @@ def test_build_static_site_replaces_same_day_archive_without_duplicate(
         output_dir,
         generated_at="2026-07-30T05:00:00Z",
         article_count=7,
+        epub_content=UPDATED_EPUB_BYTES,
     )
     (output_dir / "digest.html").write_text(
         "<!doctype html><html><body>Updated digest</body></html>",
@@ -236,6 +258,15 @@ def test_build_static_site_replaces_same_day_archive_without_duplicate(
     assert "Updated digest" in (
         same_day_archive / "index.html"
     ).read_text(encoding="utf-8")
+    assert (
+        same_day_archive / "digest.epub"
+    ).read_bytes() == UPDATED_EPUB_BYTES
+    assert (
+        site_dir / "digest.epub"
+    ).read_bytes() == UPDATED_EPUB_BYTES
+    assert (
+        site_dir / "latest" / "digest.epub"
+    ).read_bytes() == UPDATED_EPUB_BYTES
     assert manifest["edition_count"] == 1
     assert manifest["editions"][0]["article_count"] == 7
     assert (
@@ -252,6 +283,7 @@ def test_build_static_site_allows_missing_optional_files(
     write_generated_output(
         output_dir,
         include_optional_files=False,
+        include_epub=False,
     )
 
     result = build_static_site(
@@ -262,8 +294,32 @@ def test_build_static_site_allows_missing_optional_files(
 
     assert result.index_path.is_file()
     assert not (site_dir / "digest.md").exists()
+    assert not (site_dir / "digest.epub").exists()
     assert not (site_dir / "source_report.json").exists()
     assert (site_dir / "ranked_articles.json").is_file()
+
+
+def test_build_static_site_allows_epub_to_be_disabled(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "output"
+    site_dir = tmp_path / "site"
+    write_generated_output(output_dir, include_epub=False)
+
+    result = build_static_site(
+        output_dir,
+        site_dir,
+        timezone_name="Asia/Ho_Chi_Minh",
+    )
+
+    archive_dir = site_dir / "archive" / "2026" / "07" / "30"
+
+    assert result.index_path.is_file()
+    assert (site_dir / "digest.md").is_file()
+    assert (site_dir / "source_report.json").is_file()
+    assert not (site_dir / "digest.epub").exists()
+    assert not (site_dir / "latest" / "digest.epub").exists()
+    assert not (archive_dir / "digest.epub").exists()
 
 
 @pytest.mark.parametrize(
