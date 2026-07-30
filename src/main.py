@@ -15,6 +15,7 @@ from src.filters.time_filter import filter_articles_by_time
 from src.models import Article, ConfigError, Source
 from src.ranking.rule_based import rank_articles
 from src.ranking.selection import select_articles_by_category_quota
+from src.renderers.markdown import render_markdown_digest
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -161,6 +162,30 @@ def _process_and_write_ranked_articles(
         "articles": [article.to_dict() for article in selected_articles],
     }
     _write_json_atomic(ranked_articles_path, payload)
+
+    if config.settings["features"].get("render_markdown", False):
+        markdown_path = output_dir / "digest.md"
+        markdown_content = render_markdown_digest(
+            selected_articles,
+            config.profile,
+            generated_at=ranking_result.evaluated_at,
+            project_name=str(config.settings["project"]["name"]),
+        )
+        _write_text_atomic(markdown_path, markdown_content)
+        processing_summary["rendering"] = {
+            "markdown": {
+                "enabled": True,
+                "path": str(markdown_path),
+                "article_count": len(selected_articles),
+            }
+        }
+    else:
+        processing_summary["rendering"] = {
+            "markdown": {
+                "enabled": False,
+            }
+        }
+
     return ranked_articles_path, processing_summary
 
 
@@ -171,6 +196,13 @@ def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    temporary_path.replace(path)
+
+
+def _write_text_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    temporary_path.write_text(content, encoding="utf-8")
     temporary_path.replace(path)
 
 
@@ -272,6 +304,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         summary["processing"] = processing_summary
         output_paths.append(str(ranked_path))
+
+        rendering = processing_summary.get("rendering", {})
+        if isinstance(rendering, dict):
+            markdown_rendering = rendering.get("markdown")
+            if (
+                isinstance(markdown_rendering, dict)
+                and markdown_rendering.get("enabled")
+                and isinstance(markdown_rendering.get("path"), str)
+            ):
+                output_paths.append(markdown_rendering["path"])
 
     summary["output_paths"] = output_paths
 
