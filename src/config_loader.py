@@ -117,26 +117,60 @@ def _validate_settings(settings_data: dict[str, Any]) -> None:
     if not isinstance(features, dict):
         raise ConfigError("settings.yml must contain a 'features' mapping")
 
+    _require_non_empty_string(project, "name", prefix="project")
+    _require_non_empty_string(project, "version", prefix="project")
+
     _require_positive_number(runtime, "lookback_hours")
     _require_positive_number(runtime, "request_timeout_seconds")
     _require_positive_integer(runtime, "max_articles")
     _require_positive_integer(runtime, "max_summary_chars")
+    _require_non_empty_string(runtime, "output_dir", prefix="runtime")
+    _require_non_empty_string(runtime, "user_agent", prefix="runtime")
 
-    output_dir = runtime.get("output_dir")
-    if not isinstance(output_dir, str) or not output_dir.strip():
-        raise ConfigError("runtime.output_dir must be a non-empty string")
-
-    user_agent = runtime.get("user_agent")
-    if not isinstance(user_agent, str) or not user_agent.strip():
-        raise ConfigError("runtime.user_agent must be a non-empty string")
+    if "site_dir" in runtime:
+        _require_non_empty_string(runtime, "site_dir", prefix="runtime")
 
     fail_on_source_error = runtime.get("fail_on_source_error")
     if not isinstance(fail_on_source_error, bool):
         raise ConfigError("runtime.fail_on_source_error must be a boolean")
 
-    fetch_feeds = features.get("fetch_feeds")
-    if not isinstance(fetch_feeds, bool):
-        raise ConfigError("features.fetch_feeds must be a boolean")
+    _require_boolean_feature(features, "fetch_feeds", required=True)
+
+    for feature_name in (
+        "ranking",
+        "render_markdown",
+        "render_html",
+        "render_epub",
+        "build_site",
+        "ai_editor",
+    ):
+        _require_boolean_feature(features, feature_name, required=False)
+
+
+def _require_non_empty_string(
+    data: dict[str, Any],
+    key: str,
+    *,
+    prefix: str,
+) -> None:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{prefix}.{key} must be a non-empty string")
+
+
+def _require_boolean_feature(
+    features: dict[str, Any],
+    key: str,
+    *,
+    required: bool,
+) -> None:
+    if key not in features:
+        if required:
+            raise ConfigError(f"features.{key} must be a boolean")
+        return
+
+    if not isinstance(features[key], bool):
+        raise ConfigError(f"features.{key} must be a boolean")
 
 
 def _require_positive_number(data: dict[str, Any], key: str) -> None:
