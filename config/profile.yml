@@ -10,30 +10,37 @@ categories:
     label: AI
     weight: 10
     daily_quota: 2
+
   automation_ci:
     label: Automation / CI
     weight: 10
     daily_quota: 2
+
   python:
     label: Python
     weight: 10
-    daily_quota: 2
+    daily_quota: 1
+
   linux:
     label: Linux
     weight: 10
     daily_quota: 2
+
   open_source:
     label: Open Source / Engineering
     weight: 9
     daily_quota: 1
+
   semiconductor:
     label: Semiconductor
     weight: 10
     daily_quota: 2
+
   test_engineering:
     label: Test Engineering
     weight: 10
-    daily_quota: 2
+    daily_quota: 1
+
   ebook:
     label: Ebook
     weight: 9
@@ -41,24 +48,65 @@ categories:
 
 keywords:
   high_priority:
+    # Automation / CI
     - github actions
+    - reusable workflow
     - jenkins
     - jfrog
-    - python automation
-    - arch linux
-    - kde plasma
-    - post-silicon
-    - silicon validation
+    - artifactory
+    - release automation
     - test automation
     - lab automation
+
+    # Linux
+    - arch linux
+    - kde plasma
+    - linux kernel
+    - systemd
+    - wayland
+    - kwin
+
+    # Python
+    - python automation
+    - pytest
+    - pyproject
+    - python packaging
+
+    # AI
+    - coding agent
+    - ai agent
+    - ai coding
+    - llm tooling
+
+    # Semiconductor / Test Engineering
+    - post-silicon
+    - silicon validation
+    - silicon debug
+    - semiconductor test
+    - chiplet
+    - advanced packaging
+    - eda
     - serdes
+    - ethernet
     - pcie
     - cxl
     - ucie
     - pam4
+    - pyvisa
+    - scpi
+    - lxi
+
+    # Ebook / Reading
     - koreader
+    - calibre
     - epub
+    - text to speech
+    - tts
+    - ocr
+
   low_priority:
     - celebrity
     - smartphone rumor
     - gaming deal
+    - crypto price
+    - stock price
