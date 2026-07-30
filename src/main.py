@@ -4,17 +4,21 @@ import argparse
 import json
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from src.collector import collect_feeds, write_collection_outputs
 from src.config_loader import ProjectConfig, load_project_config
-from src.models import ConfigError, Source
+from src.filters.deduplicate import deduplicate_articles
+from src.filters.time_filter import filter_articles_by_time
+from src.models import Article, ConfigError, Source
+from src.ranking.rule_based import rank_articles
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Collect RSS and Atom feeds for Daily Tech Brief."
+        description="Collect and rank RSS and Atom feeds for Daily Tech Brief."
     )
     parser.add_argument(
         "--config-dir",
@@ -42,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Print the validation or collection summary as JSON",
+        help="Print the validation or execution summary as JSON",
     )
     return parser
 
@@ -106,6 +110,88 @@ def _select_sources(config: ProjectConfig, source_ids: list[str]) -> tuple[Sourc
     return tuple(enabled_by_id[source_id] for source_id in dict.fromkeys(source_ids))
 
 
+def _process_and_write_ranked_articles(
+    config: ProjectConfig,
+    articles: tuple[Article, ...],
+    output_dir: Path,
+    *,
+    now: datetime | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    runtime = config.settings["runtime"]
+    evaluated_at = _normalize_datetime(now or datetime.now(timezone.utc))
+
+    time_result = filter_articles_by_time(
+        articles,
+        lookback_hours=float(runtime["lookback_hours"]),
+        now=evaluated_at,
+    )
+    deduplication_result = deduplicate_articles(time_result.articles)
+    ranking_result = rank_articles(
+        deduplication_result.articles,
+        config.profile,
+        now=evaluated_at,
+    )
+
+    max_articles = int(runtime["max_articles"])
+    selected_articles = ranking_result.articles[:max_articles]
+    ranked_articles_path = output_dir / "ranked_articles.json"
+
+    processing_summary: dict[str, Any] = {
+        "evaluated_at": ranking_result.evaluated_at,
+        "lookback_hours": float(runtime["lookback_hours"]),
+        "max_articles": max_articles,
+        "time_filter": time_result.summary(),
+        "deduplication": deduplication_result.summary(),
+        "ranking": ranking_result.summary(),
+        "selected_articles": len(selected_articles),
+    }
+    payload = {
+        "schema_version": 1,
+        "project": config.settings["project"],
+        "generated_at": ranking_result.evaluated_at,
+        "summary": processing_summary,
+        "article_count": len(selected_articles),
+        "articles": [article.to_dict() for article in selected_articles],
+    }
+    _write_json_atomic(ranked_articles_path, payload)
+    return ranked_articles_path, processing_summary
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    temporary_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary_path.replace(path)
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _print_execution_summary(summary: dict[str, Any]) -> None:
+    print(f"Fetched sources: {summary['fetched_sources']}/{summary['total_sources']}")
+    print(f"Warning sources: {summary['warning_sources']}")
+    print(f"Failed sources:  {summary['failed_sources']}")
+    print(f"Fetched articles: {summary['article_count']}")
+
+    processing = summary.get("processing")
+    if isinstance(processing, dict):
+        time_filter = processing["time_filter"]
+        deduplication = processing["deduplication"]
+        print(f"Articles within lookback: {time_filter['kept_articles']}")
+        print(f"Unique articles:          {deduplication['unique_articles']}")
+        print(f"Selected articles:        {processing['selected_articles']}")
+
+    print("\nOutput:")
+    for path in summary["output_paths"]:
+        print(f"- {path}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -140,19 +226,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     summary = result.summary()
-    summary["raw_articles_path"] = str(raw_path)
-    summary["source_report_path"] = str(report_path)
+    output_paths = [str(raw_path), str(report_path)]
+
+    if config.settings["features"]["ranking"]:
+        try:
+            ranked_path, processing_summary = _process_and_write_ranked_articles(
+                config=config,
+                articles=result.articles,
+                output_dir=output_dir,
+            )
+        except ValueError as exc:
+            print(f"Processing error: {exc}", file=sys.stderr)
+            return 2
+
+        summary["processing"] = processing_summary
+        output_paths.append(str(ranked_path))
+
+    summary["output_paths"] = output_paths
 
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     else:
-        print(f"Fetched sources: {result.fetched_sources}/{len(result.reports)}")
-        print(f"Warning sources: {result.warning_sources}")
-        print(f"Failed sources:  {result.failed_sources}")
-        print(f"Fetched articles: {len(result.articles)}")
-        print("\nOutput:")
-        print(f"- {raw_path}")
-        print(f"- {report_path}")
+        _print_execution_summary(summary)
 
         failed = [report for report in result.reports if report.status == "failed"]
         if failed:
