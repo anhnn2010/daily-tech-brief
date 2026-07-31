@@ -1,112 +1,193 @@
 schema_version: 1
-
 profile:
   name: personal-tech-profile
   language: en
   timezone: Asia/Ho_Chi_Minh
-
 categories:
   ai:
     label: AI
     weight: 10
     daily_quota: 2
-
   automation_ci:
     label: Automation / CI
     weight: 10
     daily_quota: 2
-
   python:
     label: Python
     weight: 10
     daily_quota: 1
-
   linux:
     label: Linux
     weight: 10
     daily_quota: 2
-
   open_source:
     label: Open Source / Engineering
     weight: 9
     daily_quota: 1
-
+  analog_mixed_signal:
+    label: Analog / Mixed-Signal
+    weight: 10
+    daily_quota: 1
   semiconductor:
     label: Semiconductor
     weight: 10
-    daily_quota: 2
-
+    daily_quota: 1
   test_engineering:
     label: Test Engineering
     weight: 10
     daily_quota: 1
-
   ebook:
     label: Ebook
     weight: 9
     daily_quota: 1
-
 keywords:
   high_priority:
-    # Automation / CI
-    - github actions
-    - reusable workflow
-    - jenkins
-    - jfrog
-    - artifactory
-    - release automation
-    - test automation
-    - lab automation
-
-    # Linux
-    - arch linux
-    - kde plasma
-    - linux kernel
-    - systemd
-    - wayland
-    - kwin
-
-    # Python
-    - python automation
-    - pytest
-    - pyproject
-    - python packaging
-
-    # AI
-    - coding agent
-    - ai agent
-    - ai coding
-    - llm tooling
-
-    # Semiconductor / Test Engineering
-    - post-silicon
-    - silicon validation
-    - silicon debug
-    - semiconductor test
-    - chiplet
-    - advanced packaging
-    - eda
-    - serdes
-    - ethernet
-    - pcie
-    - cxl
-    - ucie
-    - pam4
-    - pyvisa
-    - scpi
-    - lxi
-
-    # Ebook / Reading
-    - koreader
-    - calibre
-    - epub
-    - text to speech
-    - tts
-    - ocr
-
+  - github actions
+  - reusable workflow
+  - jenkins
+  - jfrog
+  - artifactory
+  - release automation
+  - test automation
+  - lab automation
+  - arch linux
+  - kde plasma
+  - linux kernel
+  - systemd
+  - wayland
+  - kwin
+  - python automation
+  - pytest
+  - pyproject
+  - python packaging
+  - coding agent
+  - ai agent
+  - ai coding
+  - llm tooling
+  - post-silicon
+  - silicon validation
+  - silicon debug
+  - semiconductor test
+  - chiplet
+  - advanced packaging
+  - eda
+  - serdes
+  - ethernet
+  - pcie
+  - cxl
+  - ucie
+  - pam4
+  - pyvisa
+  - scpi
+  - lxi
+  - koreader
+  - calibre
+  - epub
+  - text to speech
+  - tts
+  - ocr
+  - workflow automation
+  - api automation
+  - fastapi
+  - web scraping
+  - scrapy
+  - playwright
+  - browser automation
+  - document automation
+  - pymupdf
+  - ocrmypdf
+  - bash
+  - shell script
+  - shellcheck
+  - command line
+  - linux command
+  - jq
+  - ripgrep
+  - awk
+  - sed
+  - xargs
+  - ssh
+  - rsync
+  - cron
+  - core analog
+  - analog core
+  - analog building block
+  - analog front end
+  - mixed-signal
+  - bandgap reference
+  - current mirror
+  - bias circuit
+  - reference generator
+  - low-dropout regulator
+  - ldo
+  - charge pump
+  - operational amplifier
+  - comparator
+  - level shifter
+  - common-mode feedback
+  - phase-locked loop
+  - pll
+  - delay-locked loop
+  - dll
+  - voltage-controlled oscillator
+  - vco
+  - phase-frequency detector
+  - phase detector
+  - loop filter
+  - loop bandwidth
+  - lock time
+  - frequency synthesizer
+  - phase noise
+  - clock jitter
+  - analog-to-digital converter
+  - adc
+  - digital-to-analog converter
+  - dac
+  - sample and hold
+  - track and hold
+  - quantization
+  - effective number of bits
+  - enob
+  - signal-to-noise ratio
+  - sfdr
+  - integral nonlinearity
+  - inl
+  - differential nonlinearity
+  - dnl
+  - clock and data recovery
+  - cdr
+  - continuous-time linear equalizer
+  - ctle
+  - decision feedback equalizer
+  - dfe
+  - feed-forward equalizer
+  - ffe
+  - eye diagram
+  - bathtub curve
+  - bit error rate
+  - jitter tolerance
+  - silicon characterization
+  - pvt characterization
+  - voltage sweep
+  - temperature sweep
+  - frequency sweep
+  - shmoo plot
+  - foreground calibration
+  - background calibration
+  - analog calibration
+  - trimming
+  - efuse
+  - margining
+  - guard band
+  - yield analysis
+  - measurement uncertainty
+  - test correlation
+  - analog scan
+  - adaptive test
+  - automatic test equipment
   low_priority:
-    - celebrity
-    - smartphone rumor
-    - gaming deal
-    - crypto price
-    - stock price
+  - celebrity
+  - smartphone rumor
+  - gaming deal
+  - crypto price
+  - stock price
