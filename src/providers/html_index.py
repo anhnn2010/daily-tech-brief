@@ -288,6 +288,7 @@ def _extract_author(
 
     author = _clean_text(match.group(1))
     author = _DATE_RE.split(author, maxsplit=1)[0]
+    author = _clean_text(author).rstrip(" |\t·•-–—:")
     return author or None
 
 
