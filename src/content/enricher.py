@@ -184,6 +184,8 @@ class ArticleContentEnricher:
                 error="Article URL is not a valid HTTP or HTTPS URL",
             )
 
+        response: requests.Response | None = None
+
         try:
             response = self._session.get(
                 article.url,
@@ -194,10 +196,27 @@ class ArticleContentEnricher:
             )
             response.raise_for_status()
         except requests.RequestException as exc:
+            http_status = (
+                response.status_code
+                if response is not None
+                else None
+            )
+            content_type = (
+                _normalize_content_type(
+                    response.headers.get("Content-Type")
+                )
+                if response is not None
+                else None
+            )
+            if response is not None:
+                response.close()
+
             return self._fetch_failed(
                 article,
                 started=started,
                 error=str(exc),
+                http_status=http_status,
+                content_type=content_type,
             )
 
         content_type = _normalize_content_type(
@@ -224,6 +243,14 @@ class ArticleContentEnricher:
             body = _read_limited_body(
                 response,
                 maximum_bytes=self._maximum_download_bytes,
+            )
+        except requests.RequestException as exc:
+            return self._fetch_failed(
+                article,
+                started=started,
+                error=str(exc),
+                http_status=response.status_code,
+                content_type=content_type,
             )
         except ValueError as exc:
             return self._fallback(
@@ -343,6 +370,8 @@ class ArticleContentEnricher:
         *,
         started: float,
         error: str,
+        http_status: int | None = None,
+        content_type: str | None = None,
     ) -> tuple[Article, ContentEnrichmentRecord]:
         failed_article = replace(
             article,
@@ -358,8 +387,8 @@ class ArticleContentEnricher:
                 title=article.title,
                 url=article.url,
                 status=_CONTENT_STATUS_FETCH_FAILED,
-                http_status=None,
-                content_type=None,
+                http_status=http_status,
+                content_type=content_type,
                 selector=None,
                 word_count=0,
                 duration_seconds=_duration(started),
