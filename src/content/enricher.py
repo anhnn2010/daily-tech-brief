@@ -35,6 +35,15 @@ _CONTENT_STATUS_SUMMARY_FALLBACK = "summary_fallback"
 _CONTENT_STATUS_FETCH_FAILED = "fetch_failed"
 _CONTENT_STATUS_NOT_REQUESTED = "not_requested"
 
+_CONTENT_ORIGIN_FEED = "feed"
+_CONTENT_ORIGIN_CURATED = "curated"
+_CONTENT_ORIGIN_WEB = "web"
+_CONTENT_ORIGIN_SUMMARY = "summary"
+_CONTENT_ORIGIN_NONE = "none"
+_CONTENT_ORIGIN_UNKNOWN = "unknown"
+
+_CURATED_CONTENT_TAG = "learning_content:curated"
+
 
 @dataclass(frozen=True)
 class ContentEnrichmentRecord:
@@ -48,6 +57,7 @@ class ContentEnrichmentRecord:
     word_count: int
     duration_seconds: float
     error: str | None
+    content_origin: str = _CONTENT_ORIGIN_UNKNOWN
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -174,6 +184,9 @@ class ArticleContentEnricher:
                     ),
                     duration_seconds=_duration(started),
                     error=None,
+                    content_origin=_preloaded_content_origin(
+                        article
+                    ),
                 ),
             )
 
@@ -321,6 +334,7 @@ class ArticleContentEnricher:
                 word_count=extracted.word_count,
                 duration_seconds=_duration(started),
                 error=None,
+                content_origin=_CONTENT_ORIGIN_WEB,
             ),
         )
 
@@ -370,6 +384,7 @@ class ArticleContentEnricher:
                 word_count=_word_count(article.summary),
                 duration_seconds=_duration(started),
                 error=error,
+                content_origin=_CONTENT_ORIGIN_SUMMARY,
             ),
         )
 
@@ -411,6 +426,7 @@ class ArticleContentEnricher:
                 word_count=0,
                 duration_seconds=_duration(started),
                 error=error,
+                content_origin=_CONTENT_ORIGIN_NONE,
             ),
         )
 
@@ -483,6 +499,18 @@ def _read_limited_body(
 
     return b"".join(chunks)
 
+
+
+
+def _preloaded_content_origin(
+    article: Article,
+) -> str:
+    """Identify full content already attached before web enrichment."""
+
+    if _CURATED_CONTENT_TAG in article.source_tags:
+        return _CONTENT_ORIGIN_CURATED
+
+    return _CONTENT_ORIGIN_FEED
 
 
 def _has_readable_summary(

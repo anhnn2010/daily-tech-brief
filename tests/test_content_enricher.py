@@ -184,6 +184,7 @@ def test_enriches_article_and_uses_browser_headers() -> None:
     assert record.selector == "[itemprop='articleBody']"
     assert record.word_count == 4
     assert record.error is None
+    assert record.content_origin == "web"
 
     assert extractor.calls == [
         {
@@ -230,6 +231,10 @@ def test_timeout_and_http_error_use_available_summary() -> None:
         2,
         2,
     ]
+    assert [record.content_origin for record in result.records] == [
+        "summary",
+        "summary",
+    ]
     assert "slow site" in (result.records[0].error or "")
     assert "403 Client Error" in (result.records[1].error or "")
     assert extractor.calls == []
@@ -246,6 +251,7 @@ def test_request_error_without_summary_remains_fetch_failed() -> None:
 
     assert result.articles[0].content_status == "fetch_failed"
     assert result.records[0].status == "fetch_failed"
+    assert result.records[0].content_origin == "none"
     assert "offline" in (result.records[0].error or "")
     assert extractor.calls == []
 
@@ -500,3 +506,42 @@ def test_wrapper_keeps_external_session_open() -> None:
 
     assert result.extracted_count == 1
     assert session.closed is False
+
+
+def test_preloaded_content_reports_feed_and_curated_origins() -> None:
+    feed_article = replace(
+        _article(title="Feed content"),
+        content_html="<p>Full feed article body.</p>",
+        content_text="Full feed article body.",
+        content_status="extracted",
+    )
+    curated_article = replace(
+        _article(title="Curated lesson"),
+        source_tags=(
+            "technical_learning",
+            "learning_content:curated",
+        ),
+        content_html="<p>Curated offline lesson.</p>",
+        content_text="Curated offline lesson.",
+        content_status="extracted",
+    )
+    session = FakeSession([])
+    extractor = StubExtractor(_usable_extracted())
+
+    result = _enricher(session, extractor).enrich(
+        [feed_article, curated_article]
+    )
+
+    assert [
+        record.content_origin
+        for record in result.records
+    ] == [
+        "feed",
+        "curated",
+    ]
+    assert [record.http_status for record in result.records] == [
+        None,
+        None,
+    ]
+    assert session.calls == []
+    assert extractor.calls == []
