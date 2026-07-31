@@ -52,11 +52,15 @@ def test_bundled_configuration_is_valid() -> None:
     config = load_project_config(PROJECT_ROOT / "config")
     sources_by_id = {source.id: source for source in config.sources}
 
-    assert len(config.sources) == 18
-    assert len(config.enabled_sources) == 17
+    assert len(config.sources) == 34
+    assert len(config.enabled_sources) == 33
     assert all(source.official for source in config.sources)
     assert sources_by_id["real_python"].enabled is False
     assert sources_by_id["python_bytes"].enabled is True
+    assert sources_by_id["n8n_blog"].enabled is True
+    assert sources_by_id["fastapi_releases"].enabled is True
+    assert sources_by_id["shellcheck_releases"].enabled is True
+    assert sources_by_id["jq_releases"].enabled is True
 
     assert config.settings["project"] == {
         "name": "Daily Tech Brief",
@@ -77,6 +81,32 @@ def test_bundled_configuration_is_valid() -> None:
         "build_site": True,
         "ai_editor": False,
     }
+
+
+    categories = config.profile["categories"]
+    assert "analog_mixed_signal" in categories
+    assert categories["analog_mixed_signal"] == {
+        "label": "Analog / Mixed-Signal",
+        "weight": 10,
+        "daily_quota": 1,
+    }
+    assert categories["semiconductor"]["daily_quota"] == 1
+    assert sum(
+        category["daily_quota"]
+        for category in categories.values()
+    ) == 12
+
+    high_priority_keywords = {
+        keyword.casefold()
+        for keyword in config.profile["keywords"]["high_priority"]
+    }
+    assert {
+        "pll",
+        "phase noise",
+        "bandgap reference",
+        "shell script",
+        "workflow automation",
+    } <= high_priority_keywords
 
 
 def test_source_ids_are_unique() -> None:
