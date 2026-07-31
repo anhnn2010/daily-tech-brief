@@ -24,6 +24,7 @@ def _lesson(
         "pll",
         "clocking",
     ),
+    content_html: str = "",
 ) -> LearningLesson:
     return LearningLesson(
         id=lesson_id,
@@ -42,6 +43,7 @@ def _lesson(
             "It provides a structure for debugging lock and clock issues."
         ),
         enabled=True,
+        content_html=content_html,
     )
 
 
@@ -103,6 +105,60 @@ def test_converts_analog_lesson_to_article() -> None:
     assert "Why it matters:" in article.summary
     assert "Estimated reading time: 30 minutes." in article.summary
     assert article.summary.endswith("Difficulty: intermediate.")
+
+
+def test_lesson_without_curated_content_remains_not_requested() -> None:
+    article = learning_lesson_to_article(_lesson())
+
+    assert article.content_html == ""
+    assert article.content_text == ""
+    assert article.content_status == "not_requested"
+    assert article.has_full_content is False
+    assert "learning_content:curated" not in article.source_tags
+
+
+def test_curated_content_is_sanitized_and_marked_extracted() -> None:
+    article = learning_lesson_to_article(
+        _lesson(
+            content_html=(
+                "<h2>Current mirror operation</h2>"
+                "<p>A reference branch establishes the gate voltage "
+                "used by the output branch.</p>"
+                "<p><a href='/biasing'>Read the biasing note</a></p>"
+                "<div class='related-posts'>Related article</div>"
+                "<script>alert('remove me')</script>"
+            )
+        )
+    )
+
+    assert article.content_status == "extracted"
+    assert article.has_full_content is True
+    assert "Current mirror operation" in article.content_text
+    assert "reference branch" in article.content_text
+    assert "Related article" not in article.content_text
+    assert "remove me" not in article.content_text
+    assert "<script" not in article.content_html
+    assert "related-posts" not in article.content_html
+    assert (
+        'href="https://example.com/biasing"'
+        in article.content_html
+    )
+    assert "learning_content:curated" in article.source_tags
+
+
+def test_curated_content_empty_after_sanitization_is_rejected() -> None:
+    with pytest.raises(
+        ValueError,
+        match="empty after sanitization",
+    ):
+        learning_lesson_to_article(
+            _lesson(
+                content_html=(
+                    "<script>alert('remove me')</script>"
+                    "<aside>Sidebar only</aside>"
+                )
+            )
+        )
 
 
 @pytest.mark.parametrize(

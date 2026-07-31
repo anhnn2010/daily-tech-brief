@@ -98,6 +98,10 @@ def test_loads_bundled_learning_library() -> None:
     assert len(library.enabled_lessons) == 16
     assert library.lessons[0].id == "current_mirror_types"
     assert library.lessons[-1].id == "shmoo_and_silent_errors"
+    assert len(library.lessons[0].content_html) > 8_000
+    assert "Why current mirrors matter" in (
+        library.lessons[0].content_html
+    )
 
     tracks = {
         lesson.track
@@ -134,6 +138,62 @@ def test_sorts_lessons_and_filters_disabled(
     ] == [
         "lesson_b",
     ]
+
+
+def test_content_html_is_optional_and_defaults_to_empty(
+    tmp_path: Path,
+) -> None:
+    path = _write_library(
+        tmp_path,
+        _valid_library(),
+    )
+
+    library = load_learning_library(path)
+
+    assert all(
+        lesson.content_html == ""
+        for lesson in library.lessons
+    )
+
+
+def test_loads_optional_curated_content(
+    tmp_path: Path,
+) -> None:
+    data = _valid_library()
+    data["lessons"][0]["content_html"] = (
+        "<h2>Current mirror</h2>"
+        "<p>A curated offline lesson.</p>"
+    )
+    path = _write_library(tmp_path, data)
+
+    library = load_learning_library(path)
+    lesson = next(
+        lesson
+        for lesson in library.lessons
+        if lesson.id == "lesson_b"
+    )
+
+    assert lesson.content_html.startswith(
+        "<h2>Current mirror</h2>"
+    )
+    assert "curated offline lesson" in lesson.content_html
+
+
+def test_non_string_curated_content_is_rejected(
+    tmp_path: Path,
+) -> None:
+    data = _valid_library()
+    data["lessons"][0]["content_html"] = [
+        "paragraph one",
+        "paragraph two",
+    ]
+    path = _write_library(tmp_path, data)
+
+    with pytest.raises(
+        LearningLibraryError,
+        match=r"lessons\[0\]\.content_html must be a string",
+    ):
+        load_learning_library(path)
 
 
 def test_missing_library_file_is_rejected(
