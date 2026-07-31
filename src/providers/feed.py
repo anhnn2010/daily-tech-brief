@@ -25,6 +25,7 @@ _BROWSER_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/149.0.0.0 Safari/537.36"
 )
+_MAX_RETRY_TIMEOUT_SECONDS = 60.0
 
 
 class FeedProvider:
@@ -86,21 +87,57 @@ class FeedProvider:
                 timeout=self._timeout_seconds,
                 headers=self._default_headers(),
             )
+        except requests.Timeout:
+            return self._retry_after_timeout(source)
+        except requests.RequestException as exc:
+            raise FeedFetchError(str(exc)) from exc
 
-            if response.status_code == 403:
-                response = self._session.get(
-                    source.url,
-                    timeout=self._timeout_seconds,
-                    headers=self._browser_compatible_headers(source.url),
-                )
-                request_profile = "browser_compatible"
-                retry_count = 1
-            else:
-                request_profile = "default"
-                retry_count = 0
+        if response.status_code == 403:
+            return self._retry_with_browser_headers(
+                source,
+                timeout_seconds=self._timeout_seconds,
+                request_profile="browser_compatible",
+            )
 
+        try:
             response.raise_for_status()
-            return response, request_profile, retry_count
+        except requests.RequestException as exc:
+            raise FeedFetchError(str(exc)) from exc
+
+        return response, "default", 0
+
+    def _retry_after_timeout(
+        self,
+        source: Source,
+    ) -> tuple[requests.Response, str, int]:
+        retry_timeout = min(
+            max(
+                self._timeout_seconds * 2,
+                self._timeout_seconds + 10,
+            ),
+            _MAX_RETRY_TIMEOUT_SECONDS,
+        )
+        return self._retry_with_browser_headers(
+            source,
+            timeout_seconds=retry_timeout,
+            request_profile="browser_compatible_timeout_retry",
+        )
+
+    def _retry_with_browser_headers(
+        self,
+        source: Source,
+        *,
+        timeout_seconds: float,
+        request_profile: str,
+    ) -> tuple[requests.Response, str, int]:
+        try:
+            response = self._session.get(
+                source.url,
+                timeout=timeout_seconds,
+                headers=self._browser_compatible_headers(source.url),
+            )
+            response.raise_for_status()
+            return response, request_profile, 1
         except requests.RequestException as exc:
             raise FeedFetchError(str(exc)) from exc
 
@@ -125,7 +162,11 @@ class FeedProvider:
 
 
 class ParsedFeed:
-    def __init__(self, title: str | None, entries: list[dict[str, str | None]]) -> None:
+    def __init__(
+        self,
+        title: str | None,
+        entries: list[dict[str, str | None]],
+    ) -> None:
         self.title = title
         self.entries = entries
 
@@ -141,27 +182,52 @@ def _parse_feed(content: bytes) -> ParsedFeed:
     if root_name == "rdf":
         return _parse_rss1(root)
 
-    raise ValueError(f"Unsupported feed root element: {root_name}")
+    raise ValueError(
+        f"Unsupported feed root element: {root_name}"
+    )
 
 
 def _parse_rss2(root: ET.Element) -> ParsedFeed:
     channel = _first_child(root, "channel")
     if channel is None:
-        raise ValueError("RSS feed is missing the channel element")
+        raise ValueError(
+            "RSS feed is missing the channel element"
+        )
 
-    title = _element_text(_first_child(channel, "title")) or None
-    entries = [_parse_rss_item(item) for item in _children(channel, "item")]
-    return ParsedFeed(title=title, entries=entries)
+    title = (
+        _element_text(_first_child(channel, "title"))
+        or None
+    )
+    entries = [
+        _parse_rss_item(item)
+        for item in _children(channel, "item")
+    ]
+    return ParsedFeed(
+        title=title,
+        entries=entries,
+    )
 
 
 def _parse_rss1(root: ET.Element) -> ParsedFeed:
     channel = _first_child(root, "channel")
-    title = _element_text(_first_child(channel, "title")) if channel is not None else ""
-    entries = [_parse_rss_item(item) for item in _children(root, "item")]
-    return ParsedFeed(title=title or None, entries=entries)
+    title = (
+        _element_text(_first_child(channel, "title"))
+        if channel is not None
+        else ""
+    )
+    entries = [
+        _parse_rss_item(item)
+        for item in _children(root, "item")
+    ]
+    return ParsedFeed(
+        title=title or None,
+        entries=entries,
+    )
 
 
-def _parse_rss_item(item: ET.Element) -> dict[str, str | None]:
+def _parse_rss_item(
+    item: ET.Element,
+) -> dict[str, str | None]:
     summary_element = _first_present_child(
         item,
         "encoded",
@@ -173,14 +239,20 @@ def _parse_rss_item(item: ET.Element) -> dict[str, str | None]:
         or _element_text(_first_child(item, "date"))
         or _element_text(_first_child(item, "published"))
     )
-    updated = _element_text(_first_child(item, "updated"))
+    updated = _element_text(
+        _first_child(item, "updated")
+    )
     author = (
         _element_text(_first_child(item, "author"))
         or _element_text(_first_child(item, "creator"))
     )
     return {
-        "title": _element_text(_first_child(item, "title")),
-        "url": _element_text(_first_child(item, "link")),
+        "title": _element_text(
+            _first_child(item, "title")
+        ),
+        "url": _element_text(
+            _first_child(item, "link")
+        ),
         "external_id": (
             _element_text(_first_child(item, "guid"))
             or _element_text(_first_child(item, "id"))
@@ -193,26 +265,52 @@ def _parse_rss_item(item: ET.Element) -> dict[str, str | None]:
 
 
 def _parse_atom(root: ET.Element) -> ParsedFeed:
-    title = _element_text(_first_child(root, "title")) or None
-    entries = [_parse_atom_entry(entry) for entry in _children(root, "entry")]
-    return ParsedFeed(title=title, entries=entries)
+    title = (
+        _element_text(_first_child(root, "title"))
+        or None
+    )
+    entries = [
+        _parse_atom_entry(entry)
+        for entry in _children(root, "entry")
+    ]
+    return ParsedFeed(
+        title=title,
+        entries=entries,
+    )
 
 
-def _parse_atom_entry(entry: ET.Element) -> dict[str, str | None]:
-    summary_element = _first_present_child(entry, "summary", "content")
+def _parse_atom_entry(
+    entry: ET.Element,
+) -> dict[str, str | None]:
+    summary_element = _first_present_child(
+        entry,
+        "summary",
+        "content",
+    )
     author_element = _first_child(entry, "author")
     author = None
     if author_element is not None:
-        author = _element_text(_first_child(author_element, "name")) or _element_text(
-            author_element
+        author = (
+            _element_text(
+                _first_child(author_element, "name")
+            )
+            or _element_text(author_element)
         )
 
     return {
-        "title": _element_text(_first_child(entry, "title")),
+        "title": _element_text(
+            _first_child(entry, "title")
+        ),
         "url": _atom_link(entry),
-        "external_id": _element_text(_first_child(entry, "id")),
-        "published": _element_text(_first_child(entry, "published")),
-        "updated": _element_text(_first_child(entry, "updated")),
+        "external_id": _element_text(
+            _first_child(entry, "id")
+        ),
+        "published": _element_text(
+            _first_child(entry, "published")
+        ),
+        "updated": _element_text(
+            _first_child(entry, "updated")
+        ),
         "summary": _element_content(summary_element),
         "author": author,
     }
@@ -221,8 +319,12 @@ def _parse_atom_entry(entry: ET.Element) -> dict[str, str | None]:
 def _atom_link(entry: ET.Element) -> str:
     fallback = ""
     for link in _children(entry, "link"):
-        href = str(link.attrib.get("href", "")).strip()
-        rel = str(link.attrib.get("rel", "alternate")).strip()
+        href = str(
+            link.attrib.get("href", "")
+        ).strip()
+        rel = str(
+            link.attrib.get("rel", "alternate")
+        ).strip()
         if not href:
             continue
         if rel in {"alternate", ""}:
@@ -238,11 +340,20 @@ def _build_article(
     fetched_at: datetime,
     max_summary_chars: int,
 ) -> Article:
-    title = _clean_text(entry.get("title") or "") or "Untitled"
+    title = (
+        _clean_text(entry.get("title") or "")
+        or "Untitled"
+    )
     url = _clean_text(entry.get("url") or "")
     summary = _clean_html(entry.get("summary") or "")
-    if max_summary_chars > 0 and len(summary) > max_summary_chars:
-        summary = summary[: max_summary_chars - 1].rstrip() + "…"
+    if (
+        max_summary_chars > 0
+        and len(summary) > max_summary_chars
+    ):
+        summary = (
+            summary[: max_summary_chars - 1].rstrip()
+            + "…"
+        )
 
     return Article(
         source_id=source.id,
@@ -252,24 +363,39 @@ def _build_article(
         source_tags=source.tags,
         title=title,
         url=url,
-        external_id=_optional_text(entry.get("external_id") or url),
-        published_at=_parse_datetime(entry.get("published")),
-        updated_at=_parse_datetime(entry.get("updated")),
+        external_id=_optional_text(
+            entry.get("external_id") or url
+        ),
+        published_at=_parse_datetime(
+            entry.get("published")
+        ),
+        updated_at=_parse_datetime(
+            entry.get("updated")
+        ),
         summary=summary,
         author=_optional_text(entry.get("author")),
         fetched_at=_to_iso(fetched_at),
     )
 
 
-def _children(element: ET.Element, name: str) -> Iterable[ET.Element]:
-    return (child for child in element if _local_name(child.tag) == name)
+def _children(
+    element: ET.Element,
+    name: str,
+) -> Iterable[ET.Element]:
+    return (
+        child
+        for child in element
+        if _local_name(child.tag) == name
+    )
 
 
-def _first_child(element: ET.Element | None, name: str) -> ET.Element | None:
+def _first_child(
+    element: ET.Element | None,
+    name: str,
+) -> ET.Element | None:
     if element is None:
         return None
     return next(_children(element, name), None)
-
 
 
 def _first_present_child(
@@ -282,17 +408,27 @@ def _first_present_child(
             return child
     return None
 
+
 def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1].rsplit(":", 1)[-1]
+    return (
+        tag.rsplit("}", 1)[-1]
+        .rsplit(":", 1)[-1]
+    )
 
 
-def _element_text(element: ET.Element | None) -> str:
+def _element_text(
+    element: ET.Element | None,
+) -> str:
     if element is None:
         return ""
-    return _clean_text(" ".join(element.itertext()))
+    return _clean_text(
+        " ".join(element.itertext())
+    )
 
 
-def _element_content(element: ET.Element | None) -> str:
+def _element_content(
+    element: ET.Element | None,
+) -> str:
     if element is None:
         return ""
     if len(element) == 0:
@@ -301,11 +437,19 @@ def _element_content(element: ET.Element | None) -> str:
     parts: list[str] = []
     if element.text:
         parts.append(element.text)
-    parts.extend(ET.tostring(child, encoding="unicode") for child in element)
+    parts.extend(
+        ET.tostring(
+            child,
+            encoding="unicode",
+        )
+        for child in element
+    )
     return " ".join(parts)
 
 
-def _parse_datetime(value: str | None) -> str | None:
+def _parse_datetime(
+    value: str | None,
+) -> str | None:
     if not value:
         return None
 
@@ -314,24 +458,34 @@ def _parse_datetime(value: str | None) -> str | None:
         parsed = parsedate_to_datetime(text)
     except (TypeError, ValueError, OverflowError):
         try:
-            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(
+                text.replace("Z", "+00:00")
+            )
         except ValueError:
             return text
 
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(
+            tzinfo=timezone.utc
+        )
     return _to_iso(parsed)
 
 
 def _clean_html(value: str) -> str:
     if not value:
         return ""
-    text = BeautifulSoup(value, "html.parser").get_text(" ", strip=True)
+    text = BeautifulSoup(
+        value,
+        "html.parser",
+    ).get_text(" ", strip=True)
     return _clean_text(text)
 
 
 def _clean_text(value: str) -> str:
-    return _WHITESPACE_RE.sub(" ", unescape(value)).strip()
+    return _WHITESPACE_RE.sub(
+        " ",
+        unescape(value),
+    ).strip()
 
 
 def _optional_text(value: Any) -> str | None:
@@ -342,5 +496,11 @@ def _optional_text(value: Any) -> str | None:
 
 
 def _to_iso(value: datetime) -> str:
-    normalized = value.astimezone(timezone.utc).replace(microsecond=0)
-    return normalized.isoformat().replace("+00:00", "Z")
+    normalized = (
+        value.astimezone(timezone.utc)
+        .replace(microsecond=0)
+    )
+    return normalized.isoformat().replace(
+        "+00:00",
+        "Z",
+    )

@@ -278,6 +278,27 @@ sources:
   - cloud_native
   - platform_engineering
   - observability
+- id: analog_devices_engineering_mind
+  name: Analog Devices Engineering Mind
+  provider: feed
+  format: rss
+  url: https://ez.analog.com/ez-blogs/b/engineering-mind/rss
+  category: analog_mixed_signal
+  priority: 10
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - analog
+  - mixed_signal
+  - pll
+  - clocking
+  - adc
+  - dac
+  - ltspice
+  - signal_chain
+  - calibration
+  - post_silicon_learning
 - id: synopsys_news
   name: Synopsys News Releases
   provider: feed
