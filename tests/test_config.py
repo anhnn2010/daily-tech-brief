@@ -52,8 +52,8 @@ def test_bundled_configuration_is_valid() -> None:
     config = load_project_config(PROJECT_ROOT / "config")
     sources_by_id = {source.id: source for source in config.sources}
 
-    assert len(config.sources) == 34
-    assert len(config.enabled_sources) == 33
+    assert len(config.sources) == 35
+    assert len(config.enabled_sources) == 34
     assert all(source.official for source in config.sources)
     assert sources_by_id["real_python"].enabled is False
     assert sources_by_id["python_bytes"].enabled is True
@@ -61,6 +61,22 @@ def test_bundled_configuration_is_valid() -> None:
     assert sources_by_id["fastapi_releases"].enabled is True
     assert sources_by_id["shellcheck_releases"].enabled is True
     assert sources_by_id["jq_releases"].enabled is True
+
+    analog_source = sources_by_id[
+        "analog_devices_engineering_mind"
+    ]
+    assert analog_source.enabled is True
+    assert analog_source.provider == "feed"
+    assert analog_source.format == "rss"
+    assert analog_source.category == "analog_mixed_signal"
+    assert analog_source.priority == 10
+    assert {
+        "pll",
+        "clocking",
+        "adc",
+        "dac",
+        "calibration",
+    } <= set(analog_source.tags)
 
     assert config.settings["project"] == {
         "name": "Daily Tech Brief",
