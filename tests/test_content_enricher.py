@@ -226,6 +226,10 @@ def test_timeout_and_http_error_use_available_summary() -> None:
         "summary_fallback",
         "summary_fallback",
     ]
+    assert [record.word_count for record in result.records] == [
+        2,
+        2,
+    ]
     assert "slow site" in (result.records[0].error or "")
     assert "403 Client Error" in (result.records[1].error or "")
     assert extractor.calls == []
@@ -326,11 +330,15 @@ def test_insufficient_extraction_uses_summary_fallback() -> None:
         )
     )
 
-    result = _enricher(session, extractor).enrich([_article()])
+    article = replace(
+        _article(),
+        summary="Readable fallback summary for offline use.",
+    )
+    result = _enricher(session, extractor).enrich([article])
 
     assert result.articles[0].content_status == "summary_fallback"
     assert result.records[0].selector == "article"
-    assert result.records[0].word_count == 2
+    assert result.records[0].word_count == 6
     assert "too short" in (result.records[0].error or "")
 
 
@@ -345,6 +353,22 @@ def test_extractor_error_uses_summary_fallback() -> None:
 
     assert result.articles[0].content_status == "summary_fallback"
     assert result.records[0].error == "invalid article markup"
+
+
+def test_unexpected_extractor_error_uses_summary_fallback() -> None:
+    response = FakeResponse(body=b"<html>broken</html>")
+    session = FakeSession([response])
+    extractor = StubExtractor(RuntimeError("parser bug"))
+
+    result = _enricher(session, extractor).enrich([_article()])
+
+    assert result.articles[0].content_status == "summary_fallback"
+    assert result.records[0].status == "summary_fallback"
+    assert result.records[0].word_count == 2
+    assert result.records[0].error == (
+        "Unexpected content extraction error: parser bug"
+    )
+    assert response.closed is True
 
 
 def test_invalid_article_url_skips_request() -> None:

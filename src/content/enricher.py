@@ -276,6 +276,17 @@ class ArticleContentEnricher:
                 content_type=content_type,
                 error=str(exc),
             )
+        except Exception as exc:
+            return self._fallback(
+                article,
+                started=started,
+                http_status=response.status_code,
+                content_type=content_type,
+                error=(
+                    "Unexpected content extraction error: "
+                    f"{exc}"
+                ),
+            )
 
         if not extracted.is_usable:
             return self._fallback(
@@ -284,7 +295,6 @@ class ArticleContentEnricher:
                 http_status=response.status_code,
                 content_type=content_type,
                 selector=extracted.selector,
-                word_count=extracted.word_count,
                 error=(
                     "Readable article content was too short "
                     "after extraction"
@@ -339,7 +349,6 @@ class ArticleContentEnricher:
         http_status: int | None = None,
         content_type: str | None = None,
         selector: str | None = None,
-        word_count: int = 0,
     ) -> tuple[Article, ContentEnrichmentRecord]:
         fallback_article = replace(
             article,
@@ -358,7 +367,7 @@ class ArticleContentEnricher:
                 http_status=http_status,
                 content_type=content_type,
                 selector=selector,
-                word_count=word_count,
+                word_count=_word_count(article.summary),
                 duration_seconds=_duration(started),
                 error=error,
             ),
