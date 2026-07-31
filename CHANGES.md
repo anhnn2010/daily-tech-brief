@@ -440,7 +440,7 @@ python -m pytest -q
 Expected result after all v0.7.0 files are applied:
 
 ```text
-128 passed
+137 passed
 ```
 
 The actual local pytest result should be treated as the release source of truth.

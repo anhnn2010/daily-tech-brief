@@ -793,7 +793,7 @@ python -m pytest -q
 After all v0.7.0 files are applied, the expected project suite contains:
 
 ```text
-128 offline tests
+137 offline tests
 ```
 
 The v0.7.0 tests cover:
