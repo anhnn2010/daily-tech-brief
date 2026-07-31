@@ -112,6 +112,47 @@ def test_epub_verification_runs_before_artifact_uploads() -> None:
     assert verify_position < pages_upload_position
 
 
+def test_workflow_verifies_technical_learning_output() -> None:
+    workflow = read_workflow()
+
+    assert "name: Verify Technical Learning output" in workflow
+    assert (
+        "python scripts/verify_technical_learning.py"
+        in workflow
+    )
+    assert "--expected-total 12" in workflow
+    assert "--expected-learning 1" in workflow
+
+
+def test_technical_learning_verification_runs_before_uploads() -> None:
+    workflow = read_workflow()
+
+    epub_verify_position = workflow.index(
+        "- name: Verify EPUB publication"
+    )
+    learning_verify_position = workflow.index(
+        "- name: Verify Technical Learning output"
+    )
+    output_upload_position = workflow.index(
+        "- name: Upload digest output artifact"
+    )
+    site_upload_position = workflow.index(
+        "- name: Upload static site artifact"
+    )
+    pages_upload_position = workflow.index(
+        "- name: Upload GitHub Pages artifact"
+    )
+    deploy_job_position = workflow.index(
+        "name: Deploy GitHub Pages"
+    )
+
+    assert epub_verify_position < learning_verify_position
+    assert learning_verify_position < output_upload_position
+    assert learning_verify_position < site_upload_position
+    assert learning_verify_position < pages_upload_position
+    assert learning_verify_position < deploy_job_position
+
+
 def test_pages_artifact_is_uploaded_only_for_production() -> None:
     workflow = read_workflow()
 
