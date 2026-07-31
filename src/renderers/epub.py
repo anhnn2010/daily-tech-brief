@@ -7,8 +7,11 @@ from datetime import datetime, timezone
 from html import escape
 from io import BytesIO
 from typing import Any, Iterable
+from xml.etree import ElementTree
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from bs4 import BeautifulSoup
 
 from src.ranking.rule_based import RankedArticle
 
@@ -16,6 +19,10 @@ from src.ranking.rule_based import RankedArticle
 _EPUB_MIMETYPE = "application/epub+zip"
 _FIXED_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 _WHITESPACE_RE = re.compile(r"\s+")
+_PARAGRAPH_BREAK_RE = re.compile(r"\n\s*\n+")
+_XML_INVALID_CHAR_RE = re.compile(
+    "[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]"
+)
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -32,9 +39,10 @@ def render_epub_digest(
 ) -> bytes:
     """Render selected articles as a deterministic EPUB 3 document.
 
-    The book is organized into one chapter per non-empty category. Article
-    URLs remain available as links, but long URLs are never displayed as
-    reading text so text-to-speech tools can read the digest naturally.
+    The book is organized into one chapter per non-empty category. When an
+    article has extracted reading content, the EPUB includes that content
+    directly. Otherwise, it falls back to the feed summary. Source URLs
+    remain available as compact links and are never displayed as raw text.
     """
 
     if not isinstance(project_name, str) or not project_name.strip():
@@ -412,24 +420,13 @@ def _render_category_chapter(
         if article.author:
             metadata_parts.append(f"Author: {article.author.strip()}.")
 
-        summary = _normalize_summary(article.summary)
-        summary_html = (
-            f"\n      <p class=\"summary\">{escape(summary)}</p>"
-            if summary
-            else ""
-        )
-        original_link = ""
-        if article.url.strip():
-            original_link = (
-                "\n      <p class=\"original-link\"><a "
-                f'href="{escape(article.url.strip(), quote=True)}">'
-                "Read the original article</a>.</p>"
-            )
+        reading_content = _render_article_reading_content(article)
+        source_link = _render_source_link(article.url)
 
         article_sections.append(
             f"""    <article id="article-{index}">
-      <h2>{escape(article.title.strip() or 'Untitled')}</h2>
-      <p class="metadata">{escape(' '.join(metadata_parts))}</p>{summary_html}{original_link}
+      <h2 class="article-title">{escape(article.title.strip() or 'Untitled')}</h2>
+      <p class="metadata">{escape(' '.join(metadata_parts))}</p>{reading_content}{source_link}
     </article>"""
         )
 
@@ -442,6 +439,98 @@ def _render_category_chapter(
         title=category_label,
         language=language,
         body=body,
+    )
+
+
+def _render_article_reading_content(article: Any) -> str:
+    content_html = str(
+        getattr(article, "content_html", "") or ""
+    ).strip()
+    content_text = str(
+        getattr(article, "content_text", "") or ""
+    ).strip()
+
+    if content_html:
+        normalized_fragment = _normalize_xhtml_fragment(
+            content_html
+        )
+        if normalized_fragment:
+            return (
+                "\n      <div class=\"article-content full-content\">"
+                f"{normalized_fragment}</div>"
+            )
+
+    if content_text:
+        rendered_text = _render_text_paragraphs(content_text)
+        if rendered_text:
+            return (
+                "\n      <div class=\"article-content full-content "
+                f"text-content\">{rendered_text}</div>"
+            )
+
+    summary = _normalize_summary(article.summary)
+    if not summary:
+        return ""
+
+    return (
+        "\n      <p class=\"summary\">"
+        f"{escape(summary)}</p>"
+    )
+
+
+def _normalize_xhtml_fragment(value: str) -> str | None:
+    cleaned = _XML_INVALID_CHAR_RE.sub("", value).strip()
+    if not cleaned:
+        return None
+
+    soup = BeautifulSoup(cleaned, "html.parser")
+    for wrapper_name in ("html", "body"):
+        for wrapper in list(soup.find_all(wrapper_name)):
+            wrapper.unwrap()
+
+    normalized = soup.decode_contents(
+        formatter="minimal",
+    ).strip()
+    if not normalized:
+        return None
+
+    try:
+        ElementTree.fromstring(
+            f"<div>{normalized}</div>"
+        )
+    except ElementTree.ParseError:
+        return None
+
+    return normalized
+
+
+def _render_text_paragraphs(value: str) -> str:
+    cleaned = _XML_INVALID_CHAR_RE.sub("", value).strip()
+    if not cleaned:
+        return ""
+
+    paragraphs: list[str] = []
+    for paragraph in _PARAGRAPH_BREAK_RE.split(cleaned):
+        normalized = _WHITESPACE_RE.sub(
+            " ",
+            paragraph,
+        ).strip()
+        if normalized:
+            paragraphs.append(
+                f"<p>{escape(normalized)}</p>"
+            )
+
+    return "".join(paragraphs)
+
+
+def _render_source_link(value: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return ""
+
+    return (
+        "\n      <p class=\"source-link\"><a "
+        f'href="{escape(value.strip(), quote=True)}">'
+        "Original source</a></p>"
     )
 
 
@@ -477,8 +566,29 @@ h1 {
 }
 
 article {
-  break-inside: avoid;
-  margin-bottom: 2.5em;
+  break-inside: auto;
+  margin-bottom: 3em;
+  page-break-inside: auto;
+}
+
+/*
+ * Start every article after the first one on a new page.
+ * Keep both modern and legacy pagination properties for e-readers.
+ */
+article + article {
+  break-before: page;
+  page-break-before: always;
+}
+
+.article-title {
+  break-after: avoid;
+  margin-bottom: 0.35em;
+  page-break-after: avoid;
+}
+
+.metadata {
+  break-after: avoid;
+  page-break-after: avoid;
 }
 
 .metadata,
@@ -487,12 +597,59 @@ article {
   font-weight: bold;
 }
 
+.article-content,
 .summary {
-  margin-top: 0.8em;
+  margin-top: 1em;
 }
 
-.original-link {
+.article-content h2,
+.article-content h3,
+.article-content h4,
+.article-content h5,
+.article-content h6 {
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+}
+
+.article-content p,
+.article-content ul,
+.article-content ol,
+.article-content blockquote,
+.article-content pre,
+.article-content table {
   margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+
+.article-content blockquote {
+  border-left: 0.2em solid #888;
+  margin-left: 0;
+  padding-left: 0.9em;
+}
+
+.article-content pre {
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.article-content table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.article-content th,
+.article-content td {
+  border: 1px solid #888;
+  padding: 0.3em;
+  vertical-align: top;
+}
+
+.source-link {
+  border-top: 1px solid #aaa;
+  font-size: 0.8em;
+  margin-top: 1.5em;
+  padding-top: 0.7em;
 }
 
 .title-page {
