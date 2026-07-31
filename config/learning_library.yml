@@ -1,0 +1,282 @@
+schema_version: 1
+
+selection:
+  enabled: true
+  daily_count: 1
+  rotation: sequential
+  include_in_max_articles: true
+  history_source: site_archive
+  timezone: Asia/Ho_Chi_Minh
+
+lessons:
+  - id: current_mirror_types
+    order: 10
+    title: Learn Analog Circuits — Current Mirror Types and Applications
+    source_name: All About Circuits
+    url: https://www.allaboutcircuits.com/technical-articles/learn-analog-circuits-introduction-to-current-mirrors-types-applications/
+    track: analog_foundations
+    topics: [current_mirror, biasing, bjt, analog_building_blocks]
+    difficulty: intermediate
+    estimated_minutes: 18
+    summary: >
+      Introduces basic, beta-helper, Widlar, and Wilson current mirrors,
+      including the assumptions and errors that affect mirrored current.
+    why_it_matters: >
+      Bias-current generation appears throughout analog cores, references,
+      PLL charge pumps, amplifiers, and calibration paths.
+    enabled: true
+
+  - id: bandgap_reference_intro
+    order: 20
+    title: Introduction to Bandgap Voltage References
+    source_name: All About Circuits
+    url: https://www.allaboutcircuits.com/technical-articles/introduction-to-bandgap-voltage-references/
+    track: analog_foundations
+    topics: [bandgap_reference, ptat, ctat, temperature, voltage_reference]
+    difficulty: intermediate
+    estimated_minutes: 20
+    summary: >
+      Explains how PTAT and CTAT behavior are combined to generate a
+      temperature-stable reference voltage.
+    why_it_matters: >
+      Bandgap references are central to analog biasing, ADC and DAC accuracy,
+      LDO regulation, trimming, and temperature characterization.
+    enabled: true
+
+  - id: voltage_reference_fundamentals
+    order: 30
+    title: Understanding and Applying Voltage References
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/app-notes/an-82f.html
+    track: analog_foundations
+    topics: [voltage_reference, bandgap_reference, noise, drift, stability]
+    difficulty: intermediate
+    estimated_minutes: 30
+    summary: >
+      Reviews bandgap and buried-Zener reference technologies, including
+      temperature coefficient, noise, long-term stability, and practical use.
+    why_it_matters: >
+      Reference quality directly affects converter accuracy, calibration
+      limits, and measured behavior across voltage and temperature.
+    enabled: true
+
+  - id: ldo_application
+    order: 40
+    title: How to Successfully Apply Low-Dropout Regulators
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/analog-dialogue/articles/applying-low-dropout-regulators.html
+    track: analog_foundations
+    topics: [ldo, psrr, noise, stability, startup]
+    difficulty: intermediate
+    estimated_minutes: 25
+    summary: >
+      Covers LDO operating regions, stability, startup, noise, power-supply
+      rejection, and the influence of input and load conditions.
+    why_it_matters: >
+      PLLs, ADCs, references, and analog cores are often sensitive to supply
+      noise and regulator startup behavior during silicon bring-up.
+    enabled: true
+
+  - id: pll_fundamentals
+    order: 50
+    title: Phase-Locked Loop Fundamentals
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/analog-dialogue/articles/phase-locked-loop-pll-fundamentals.html
+    track: pll_and_clocking
+    topics: [pll, pfd, charge_pump, vco, divider, loop_filter]
+    difficulty: intermediate
+    estimated_minutes: 30
+    summary: >
+      Introduces the main PLL blocks and explains how the closed loop controls
+      frequency and phase while shaping noise from different contributors.
+    why_it_matters: >
+      This provides the system-level map needed to debug lock failures,
+      frequency errors, noisy clocks, and calibration interactions.
+    enabled: true
+
+  - id: pll_design_debug
+    order: 60
+    title: How to Design and Debug a Phase-Locked Loop Circuit
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/analog-dialogue/articles/design-debug-a-pll-circuit.html
+    track: pll_and_clocking
+    topics: [pll, debug, loop_filter, phase_noise, reference_spur]
+    difficulty: advanced
+    estimated_minutes: 30
+    summary: >
+      Presents a structured PLL design and debug method, including architecture
+      selection, loop-filter checks, phase noise, and spur investigation.
+    why_it_matters: >
+      A systematic debug sequence is valuable when post-silicon symptoms can
+      originate from configuration, reference, supply, loop, or VCO behavior.
+    enabled: true
+
+  - id: type2_pll
+    order: 70
+    title: Introduction to Second-Order Type-2 PLLs
+    source_name: All About Circuits
+    url: https://www.allaboutcircuits.com/technical-articles/introduction-to-second-order-type-2-plls/
+    track: pll_and_clocking
+    topics: [pll, type2_pll, loop_filter, stability, bandwidth]
+    difficulty: advanced
+    estimated_minutes: 22
+    summary: >
+      Explains Type-2 PLL behavior and how loop-filter choices affect tracking,
+      steady-state error, bandwidth, and stability.
+    why_it_matters: >
+      Loop type and order help explain lock time, overshoot, stability margin,
+      and why a PLL may pass at one operating point but fail elsewhere.
+    enabled: true
+
+  - id: phase_noise_jitter
+    order: 80
+    title: Phase Noise and Jitter — Theory, Analysis, and Measurement
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/app-notes/an-1067.html
+    track: pll_and_clocking
+    topics: [phase_noise, jitter, psd, clock, measurement]
+    difficulty: advanced
+    estimated_minutes: 35
+    summary: >
+      Connects phase-noise spectral density to time-domain jitter and discusses
+      practical analysis and measurement considerations.
+    why_it_matters: >
+      Post-silicon clock and converter performance often requires translating
+      spectrum measurements into jitter and system-level SNR impact.
+    enabled: true
+
+  - id: adc_dac_types
+    order: 90
+    title: Types of ADCs and DACs
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/technical-articles/types-of-adcs-and-dacs.html
+    track: data_converters
+    topics: [adc, dac, architecture, resolution, dnl, inl]
+    difficulty: intermediate
+    estimated_minutes: 25
+    summary: >
+      Surveys common converter architectures and introduces resolution,
+      monotonicity, missing codes, DNL, and INL.
+    why_it_matters: >
+      Converter architecture determines which measurements, calibration
+      methods, and failure signatures are most meaningful during validation.
+    enabled: true
+
+  - id: adc_error_budget
+    order: 100
+    title: How ADC Errors Affect System Performance
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/technical-articles/the-abcs-of-analog-to-digital-converters-how-adc-errors-affect-system-performance.html
+    track: data_converters
+    topics: [adc, offset_error, gain_error, dnl, inl, error_budget]
+    difficulty: intermediate
+    estimated_minutes: 25
+    summary: >
+      Explains offset, gain, DNL, INL, and resolution errors and relates them
+      to practical system-level accuracy.
+    why_it_matters: >
+      Separating error components helps decide whether a mismatch comes from
+      silicon, calibration, reference, setup, or the measurement method.
+    enabled: true
+
+  - id: high_speed_adc_testing
+    order: 110
+    title: Understanding High-Speed ADC Testing and Evaluation
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/app-notes/an-835.html
+    track: data_converters
+    topics: [adc, snr, sfdr, fft, dnl, inl, test_method]
+    difficulty: advanced
+    estimated_minutes: 40
+    summary: >
+      Reviews static and dynamic ADC tests, including histogram methods,
+      spectral analysis, SNR, SFDR, and setup requirements.
+    why_it_matters: >
+      Measurement setup, coherent sampling, signal quality, and analysis
+      choices can create apparent silicon failures or hide real ones.
+    enabled: true
+
+  - id: inl_dnl_measurement
+    order: 120
+    title: INL and DNL Measurements for High-Speed ADCs
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/technical-articles/inldnl-measurements-for-types-of-highspeed-adcs.html
+    track: data_converters
+    topics: [adc, inl, dnl, histogram, code_density, measurement]
+    difficulty: advanced
+    estimated_minutes: 25
+    summary: >
+      Reviews INL and DNL definitions and describes practical techniques for
+      measuring converter linearity.
+    why_it_matters: >
+      Linearity data is commonly used for characterization, binning,
+      calibration validation, and identifying systematic code errors.
+    enabled: true
+
+  - id: ate_dac_calibration
+    order: 130
+    title: Level-Setting DAC Calibration for ATE Pin Electronics
+    source_name: Analog Devices
+    url: https://www.analog.com/en/resources/analog-dialogue/articles/level-setting-dac-calibration-for-ate-pin-electronics.html
+    track: post_silicon_test
+    topics: [ate, dac, calibration, gain_error, offset_error, dnl, inl]
+    difficulty: advanced
+    estimated_minutes: 28
+    summary: >
+      Describes calibration of DAC-based ATE resources, including gain,
+      offset, INL, and DNL considerations.
+    why_it_matters: >
+      Post-silicon results depend on both DUT behavior and instrument or ATE
+      accuracy; calibration separates those two error sources.
+    enabled: true
+
+  - id: device_validation_frontier
+    order: 140
+    title: Device Validation — The Ultimate Test Frontier
+    source_name: Semiconductor Engineering
+    url: https://semiengineering.com/device-validation-the-ultimate-test-frontier/
+    track: post_silicon_test
+    topics: [post_silicon, validation, characterization, ate, production_test]
+    difficulty: intermediate
+    estimated_minutes: 18
+    summary: >
+      Discusses the role of first-silicon bring-up, characterization,
+      functional validation, ATE, structural test, and system-level test.
+    why_it_matters: >
+      It places bench automation and characterization work within the larger
+      silicon lifecycle from bring-up to production.
+    enabled: true
+
+  - id: analog_adaptive_test
+    order: 150
+    title: Why Analog and Mixed-Signal Chips Resist Adaptive Test
+    source_name: Semiconductor Engineering
+    url: https://semiengineering.com/why-analog-and-mixed-signal-chips-resist-adaptive-test/
+    track: post_silicon_test
+    topics: [analog_test, adaptive_test, guard_band, characterization, data_quality]
+    difficulty: advanced
+    estimated_minutes: 20
+    summary: >
+      Explains why analog measurements, marginal behavior, contact quality,
+      guard bands, and limited data complicate adaptive-test decisions.
+    why_it_matters: >
+      It connects measurement integrity, outliers, limits, and test reduction
+      to real production and characterization risks.
+    enabled: true
+
+  - id: shmoo_and_silent_errors
+    order: 160
+    title: Why Silent Data Errors Are So Hard to Find
+    source_name: Semiconductor Engineering
+    url: https://semiengineering.com/why-silent-data-errors-are-so-hard-to-find/
+    track: post_silicon_test
+    topics: [shmoo, voltage, temperature, frequency, silent_error, margining]
+    difficulty: advanced
+    estimated_minutes: 20
+    summary: >
+      Examines silent data errors and describes using voltage, temperature,
+      and frequency sweeps to reproduce marginal failures.
+    why_it_matters: >
+      Shmooing and multi-dimensional margin searches are core post-silicon
+      techniques for exposing failures that normal functional tests miss.
+    enabled: true
