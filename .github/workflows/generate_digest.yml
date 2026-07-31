@@ -191,6 +191,12 @@ jobs:
 
           echo "Verified EPUB: ${archive_epub}"
 
+      - name: Verify Technical Learning output
+        run: |
+          python scripts/verify_technical_learning.py \
+            --expected-total 12 \
+            --expected-learning 1
+
       - name: List generated outputs
         run: |
           echo "Generated output files:"
