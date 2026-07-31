@@ -98,13 +98,17 @@ def test_bundled_configuration_is_valid() -> None:
         "ai_editor": False,
     }
 
-
     categories = config.profile["categories"]
-    assert "analog_mixed_signal" in categories
+    assert len(categories) == 10
     assert categories["analog_mixed_signal"] == {
         "label": "Analog / Mixed-Signal",
         "weight": 10,
         "daily_quota": 1,
+    }
+    assert categories["technical_learning"] == {
+        "label": "Technical Learning",
+        "weight": 10,
+        "daily_quota": 0,
     }
     assert categories["semiconductor"]["daily_quota"] == 1
     assert sum(
