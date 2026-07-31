@@ -4,18 +4,20 @@ import argparse
 import json
 import sys
 from collections import defaultdict
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
 from src.collector import collect_feeds, write_collection_outputs
 from src.config_loader import ProjectConfig, load_project_config
+from src.content.enricher import enrich_selected_articles
 from src.filters.deduplicate import deduplicate_articles
 from src.filters.time_filter import filter_articles_by_time
 from src.learning.pipeline import prepare_learning_edition
 from src.models import Article, ConfigError, Source
 from src.publishing.site_builder import build_static_site
-from src.ranking.rule_based import rank_articles
+from src.ranking.rule_based import RankedArticle, rank_articles
 from src.ranking.selection import select_articles_by_category_quota
 from src.renderers.epub import render_epub_digest
 from src.renderers.html import render_html_digest
@@ -116,6 +118,49 @@ def _select_sources(config: ProjectConfig, source_ids: list[str]) -> tuple[Sourc
     return tuple(enabled_by_id[source_id] for source_id in dict.fromkeys(source_ids))
 
 
+def _enrich_ranked_articles_for_epub(
+    ranked_articles: tuple[RankedArticle, ...],
+    runtime: dict[str, Any],
+) -> tuple[tuple[RankedArticle, ...], dict[str, Any]]:
+    """Fetch full text for EPUB without changing public digest payloads."""
+
+    if not ranked_articles:
+        return (), {
+            "requested_articles": 0,
+            "extracted_articles": 0,
+            "summary_fallback_articles": 0,
+            "failed_articles": 0,
+            "records": [],
+        }
+
+    result = enrich_selected_articles(
+        (ranked.article for ranked in ranked_articles),
+        timeout_seconds=float(
+            runtime.get("content_timeout_seconds", 15.0)
+        ),
+        maximum_download_bytes=int(
+            runtime.get(
+                "content_max_download_bytes",
+                5_000_000,
+            )
+        ),
+    )
+
+    enriched_ranked_articles = tuple(
+        replace(
+            ranked_article,
+            article=enriched_article,
+        )
+        for ranked_article, enriched_article in zip(
+            ranked_articles,
+            result.articles,
+            strict=True,
+        )
+    )
+
+    return enriched_ranked_articles, result.summary()
+
+
 def _process_and_write_ranked_articles(
     config: ProjectConfig,
     articles: tuple[Article, ...],
@@ -197,6 +242,22 @@ def _process_and_write_ranked_articles(
         )
     features = config.settings["features"]
     rendering_summary: dict[str, dict[str, Any]] = {}
+    epub_articles = selected_articles
+
+    if (
+        features.get("render_epub", False)
+        and features.get("full_content_epub", False)
+    ):
+        (
+            epub_articles,
+            content_enrichment_summary,
+        ) = _enrich_ranked_articles_for_epub(
+            selected_articles,
+            runtime,
+        )
+        processing_summary["content_enrichment"] = (
+            content_enrichment_summary
+        )
 
     if features.get("render_markdown", False):
         markdown_path = output_dir / "digest.md"
@@ -241,7 +302,7 @@ def _process_and_write_ranked_articles(
         if features.get("render_epub", False):
             epub_path = output_dir / "digest.epub"
             epub_content = render_epub_digest(
-                selected_articles,
+                epub_articles,
                 config.profile,
                 generated_at=ranking_result.evaluated_at,
                 project_name=str(config.settings["project"]["name"]),
@@ -336,6 +397,22 @@ def _print_execution_summary(summary: dict[str, Any]) -> None:
                     "Learning lesson IDs:     "
                     + ", ".join(str(item) for item in lesson_ids)
                 )
+
+        enrichment = processing.get("content_enrichment")
+        if isinstance(enrichment, dict):
+            print(
+                "Full content extracted:  "
+                f"{enrichment['extracted_articles']}/"
+                f"{enrichment['requested_articles']}"
+            )
+            print(
+                "Summary fallbacks:       "
+                f"{enrichment['summary_fallback_articles']}"
+            )
+            print(
+                "Content fetch failures:  "
+                f"{enrichment['failed_articles']}"
+            )
 
         selection = processing.get("selection")
         if isinstance(selection, dict):
