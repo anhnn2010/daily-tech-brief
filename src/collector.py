@@ -12,6 +12,8 @@ import requests
 from src.config_loader import ProjectConfig
 from src.models import Article, FeedFetchError, Source, SourceReport
 from src.providers.feed import FeedProvider
+from src.providers.html_index import HtmlIndexProvider
+from src.providers.router import ProviderRouter
 
 
 @dataclass(frozen=True)
@@ -24,19 +26,31 @@ class CollectionResult:
 
     @property
     def fetched_sources(self) -> int:
-        return sum(report.status != "failed" for report in self.reports)
+        return sum(
+            report.status != "failed"
+            for report in self.reports
+        )
 
     @property
     def successful_sources(self) -> int:
-        return sum(report.status == "success" for report in self.reports)
+        return sum(
+            report.status == "success"
+            for report in self.reports
+        )
 
     @property
     def failed_sources(self) -> int:
-        return sum(report.status == "failed" for report in self.reports)
+        return sum(
+            report.status == "failed"
+            for report in self.reports
+        )
 
     @property
     def warning_sources(self) -> int:
-        return sum(report.status == "warning" for report in self.reports)
+        return sum(
+            report.status == "warning"
+            for report in self.reports
+        )
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -58,16 +72,33 @@ def collect_feeds(
     session: requests.Session | None = None,
     now: datetime | None = None,
 ) -> CollectionResult:
+    """Collect articles from every configured source provider."""
+
     selected_sources = (
-        config.enabled_sources if sources is None else tuple(sources)
+        config.enabled_sources
+        if sources is None
+        else tuple(sources)
     )
     runtime = config.settings["runtime"]
     session = session or requests.Session()
-    provider = FeedProvider(
-        session=session,
-        timeout_seconds=float(runtime["request_timeout_seconds"]),
-        user_agent=str(runtime["user_agent"]),
-        max_summary_chars=int(runtime["max_summary_chars"]),
+
+    common_provider_options = {
+        "session": session,
+        "timeout_seconds": float(
+            runtime["request_timeout_seconds"]
+        ),
+        "user_agent": str(runtime["user_agent"]),
+        "max_summary_chars": int(
+            runtime["max_summary_chars"]
+        ),
+    }
+    provider = ProviderRouter(
+        feed_provider=FeedProvider(
+            **common_provider_options,
+        ),
+        html_index_provider=HtmlIndexProvider(
+            **common_provider_options,
+        ),
     )
 
     started = now or datetime.now(timezone.utc)
@@ -78,11 +109,16 @@ def collect_feeds(
     for source in selected_sources:
         source_started_at = datetime.now(timezone.utc)
         source_timer = perf_counter()
+
         try:
-            source_articles, metadata = provider.fetch(source, fetched_at=started)
+            source_articles, metadata = provider.fetch(
+                source,
+                fetched_at=started,
+            )
             warning = metadata.get("warning")
             if not source_articles and not warning:
-                warning = "Feed returned no entries"
+                warning = "Source returned no articles"
+
             status = "warning" if warning else "success"
             articles.extend(source_articles)
             report = SourceReport(
@@ -92,8 +128,13 @@ def collect_feeds(
                 url=source.url,
                 status=status,
                 started_at=_to_iso(source_started_at),
-                completed_at=_to_iso(datetime.now(timezone.utc)),
-                duration_seconds=round(perf_counter() - source_timer, 3),
+                completed_at=_to_iso(
+                    datetime.now(timezone.utc)
+                ),
+                duration_seconds=round(
+                    perf_counter() - source_timer,
+                    3,
+                ),
                 article_count=len(source_articles),
                 http_status=metadata.get("http_status"),
                 final_url=metadata.get("final_url"),
@@ -108,18 +149,27 @@ def collect_feeds(
                 url=source.url,
                 status="failed",
                 started_at=_to_iso(source_started_at),
-                completed_at=_to_iso(datetime.now(timezone.utc)),
-                duration_seconds=round(perf_counter() - source_timer, 3),
+                completed_at=_to_iso(
+                    datetime.now(timezone.utc)
+                ),
+                duration_seconds=round(
+                    perf_counter() - source_timer,
+                    3,
+                ),
                 article_count=0,
                 error=str(exc),
             )
+
         reports.append(report)
 
     completed = datetime.now(timezone.utc)
     return CollectionResult(
         started_at=_to_iso(started),
         completed_at=_to_iso(completed),
-        duration_seconds=round(perf_counter() - total_started, 3),
+        duration_seconds=round(
+            perf_counter() - total_started,
+            3,
+        ),
         articles=tuple(articles),
         reports=tuple(reports),
     )
@@ -139,30 +189,58 @@ def write_collection_outputs(
         "project": project,
         "generated_at": result.completed_at,
         "article_count": len(result.articles),
-        "articles": [article.to_dict() for article in result.articles],
+        "articles": [
+            article.to_dict()
+            for article in result.articles
+        ],
     }
     report_payload = {
         "schema_version": 1,
         "project": project,
         "generated_at": result.completed_at,
         "summary": result.summary(),
-        "sources": [report.to_dict() for report in result.reports],
+        "sources": [
+            report.to_dict()
+            for report in result.reports
+        ],
     }
 
-    _write_json_atomic(raw_articles_path, articles_payload)
-    _write_json_atomic(source_report_path, report_payload)
+    _write_json_atomic(
+        raw_articles_path,
+        articles_payload,
+    )
+    _write_json_atomic(
+        source_report_path,
+        report_payload,
+    )
     return raw_articles_path, source_report_path
 
 
-def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
-    temporary_path = path.with_suffix(path.suffix + ".tmp")
+def _write_json_atomic(
+    path: Path,
+    payload: dict[str, Any],
+) -> None:
+    temporary_path = path.with_suffix(
+        path.suffix + ".tmp"
+    )
     temporary_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
     temporary_path.replace(path)
 
 
 def _to_iso(value: datetime) -> str:
-    normalized = value.astimezone(timezone.utc).replace(microsecond=0)
-    return normalized.isoformat().replace("+00:00", "Z")
+    normalized = (
+        value.astimezone(timezone.utc)
+        .replace(microsecond=0)
+    )
+    return normalized.isoformat().replace(
+        "+00:00",
+        "Z",
+    )
