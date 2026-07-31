@@ -37,6 +37,7 @@ class LearningLesson:
     summary: str
     why_it_matters: str
     enabled: bool
+    content_html: str = ""
 
 
 @dataclass(frozen=True)
@@ -358,6 +359,11 @@ def _parse_lesson(
         "why_it_matters",
         prefix=prefix,
     )
+    content_html = _optional_string(
+        raw,
+        "content_html",
+        prefix=prefix,
+    )
     enabled = _require_bool(
         raw,
         "enabled",
@@ -394,6 +400,7 @@ def _parse_lesson(
         estimated_minutes=estimated_minutes,
         summary=summary,
         why_it_matters=why_it_matters,
+        content_html=content_html,
         enabled=enabled,
     )
 
@@ -446,6 +453,25 @@ def _require_non_empty_string(
         raise LearningLibraryError(
             f"{prefix}.{field} must be a non-empty string"
         )
+    return value.strip()
+
+
+def _optional_string(
+    data: dict[str, Any],
+    field: str,
+    *,
+    prefix: str,
+) -> str:
+    value = data.get(field, "")
+
+    if value is None:
+        return ""
+
+    if not isinstance(value, str):
+        raise LearningLibraryError(
+            f"{prefix}.{field} must be a string"
+        )
+
     return value.strip()
 
 

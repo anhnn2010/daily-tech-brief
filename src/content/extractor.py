@@ -176,7 +176,10 @@ class ArticleContentExtractor:
 
         soup = BeautifulSoup(markup, "html.parser")
         _remove_comments(soup)
-        _remove_global_noise(soup)
+        _remove_global_noise(
+            soup,
+            remove_suspicious_containers=False,
+        )
 
         candidate, selector = _select_best_candidate(
             soup,
@@ -192,11 +195,14 @@ class ArticleContentExtractor:
             )
 
         fragment = BeautifulSoup(
-            str(candidate),
+            candidate.decode_contents(),
             "html.parser",
         )
         root = fragment.body or fragment
-        _remove_global_noise(root)
+        _remove_global_noise(
+            root,
+            remove_suspicious_containers=True,
+        )
         _sanitize_fragment(
             root,
             base_url=normalized_base_url,
@@ -282,11 +288,16 @@ def _remove_comments(
 
 def _remove_global_noise(
     root: BeautifulSoup | Tag,
+    *,
+    remove_suspicious_containers: bool,
 ) -> None:
     for tag_name in _DROP_TAGS:
         for tag in list(root.find_all(tag_name)):
             if _is_live_tag(tag):
                 tag.decompose()
+
+    if not remove_suspicious_containers:
+        return
 
     for tag in list(root.find_all(True)):
         if not _is_live_tag(tag):

@@ -11,6 +11,10 @@ from urllib.parse import urlsplit
 import requests
 from bs4 import BeautifulSoup
 
+from src.content.extractor import (
+    ArticleContentExtractor,
+    ContentExtractionError,
+)
 from src.models import Article, FeedFetchError, Source
 
 
@@ -26,6 +30,8 @@ _BROWSER_USER_AGENT = (
     "Chrome/149.0.0.0 Safari/537.36"
 )
 _MAX_RETRY_TIMEOUT_SECONDS = 60.0
+_FEED_CONTENT_MINIMUM_CHARS = 250
+_FEED_CONTENT_MAXIMUM_CHARS = 120_000
 
 
 class FeedProvider:
@@ -42,6 +48,10 @@ class FeedProvider:
         self._timeout_seconds = timeout_seconds
         self._user_agent = user_agent
         self._max_summary_chars = max_summary_chars
+        self._content_extractor = ArticleContentExtractor(
+            minimum_text_chars=_FEED_CONTENT_MINIMUM_CHARS,
+            maximum_text_chars=_FEED_CONTENT_MAXIMUM_CHARS,
+        )
 
     def fetch(
         self,
@@ -63,6 +73,7 @@ class FeedProvider:
                 entry=entry,
                 fetched_at=fetched_at,
                 max_summary_chars=self._max_summary_chars,
+                content_extractor=self._content_extractor,
             )
             for entry in parsed.entries
         ]
@@ -230,9 +241,13 @@ def _parse_rss_item(
 ) -> dict[str, str | None]:
     summary_element = _first_present_child(
         item,
-        "encoded",
         "description",
         "summary",
+    )
+    content_element = _first_present_child(
+        item,
+        "encoded",
+        "content",
     )
     published = (
         _element_text(_first_child(item, "pubDate"))
@@ -260,6 +275,7 @@ def _parse_rss_item(
         "published": published,
         "updated": updated,
         "summary": _element_content(summary_element),
+        "content": _element_content(content_element),
         "author": author,
     }
 
@@ -282,11 +298,8 @@ def _parse_atom(root: ET.Element) -> ParsedFeed:
 def _parse_atom_entry(
     entry: ET.Element,
 ) -> dict[str, str | None]:
-    summary_element = _first_present_child(
-        entry,
-        "summary",
-        "content",
-    )
+    summary_element = _first_child(entry, "summary")
+    content_element = _first_child(entry, "content")
     author_element = _first_child(entry, "author")
     author = None
     if author_element is not None:
@@ -312,6 +325,7 @@ def _parse_atom_entry(
             _first_child(entry, "updated")
         ),
         "summary": _element_content(summary_element),
+        "content": _element_content(content_element),
         "author": author,
     }
 
@@ -339,13 +353,19 @@ def _build_article(
     entry: dict[str, str | None],
     fetched_at: datetime,
     max_summary_chars: int,
+    content_extractor: ArticleContentExtractor,
 ) -> Article:
     title = (
         _clean_text(entry.get("title") or "")
         or "Untitled"
     )
     url = _clean_text(entry.get("url") or "")
-    summary = _clean_html(entry.get("summary") or "")
+    raw_summary = (
+        entry.get("summary")
+        or entry.get("content")
+        or ""
+    )
+    summary = _clean_html(raw_summary)
     if (
         max_summary_chars > 0
         and len(summary) > max_summary_chars
@@ -354,6 +374,12 @@ def _build_article(
             summary[: max_summary_chars - 1].rstrip()
             + "…"
         )
+
+    content_html, content_text = _extract_feed_content(
+        entry.get("content") or "",
+        base_url=url or source.url,
+        extractor=content_extractor,
+    )
 
     return Article(
         source_id=source.id,
@@ -375,6 +401,41 @@ def _build_article(
         summary=summary,
         author=_optional_text(entry.get("author")),
         fetched_at=_to_iso(fetched_at),
+        content_html=content_html,
+        content_text=content_text,
+        content_status=(
+            "extracted"
+            if content_html or content_text
+            else "not_requested"
+        ),
+    )
+
+
+def _extract_feed_content(
+    value: str,
+    *,
+    base_url: str,
+    extractor: ArticleContentExtractor,
+) -> tuple[str, str]:
+    if not value.strip():
+        return "", ""
+
+    wrapped = f"<article>{value}</article>"
+
+    try:
+        extracted = extractor.extract(
+            wrapped,
+            base_url=base_url,
+        )
+    except ContentExtractionError:
+        return "", ""
+
+    if not extracted.is_usable:
+        return "", ""
+
+    return (
+        extracted.content_html,
+        extracted.content_text,
     )
 
 

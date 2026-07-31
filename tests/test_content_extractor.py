@@ -103,6 +103,41 @@ def test_nested_noise_elements_do_not_crash_after_parent_decompose() -> None:
     assert "Nested sidebar" not in result.content_text
 
 
+def test_layout_sidebar_class_does_not_remove_main_article() -> None:
+    html = f"""
+    <html>
+      <body>
+        <main class="changelog-layout has-sidebar">
+          <section class="changelog-entry">
+            <p>{_long_paragraph("Self-repository actions", repeat=7)}</p>
+            <p>{_long_paragraph("The new syntax", repeat=7)}</p>
+            <p>{_long_paragraph("Commit pinning", repeat=7)}</p>
+            <p>{_long_paragraph("Runner compatibility", repeat=7)}</p>
+          </section>
+
+          <div class="related-posts">Related changelog posts</div>
+          <div class="social-share">Share this update</div>
+        </main>
+      </body>
+    </html>
+    """
+
+    result = ArticleContentExtractor().extract(
+        html,
+        base_url=(
+            "https://github.blog/changelog/"
+            "2026-07-30-example/"
+        ),
+    )
+
+    assert result.status == "extracted"
+    assert result.selector == "main"
+    assert "Self-repository actions" in result.content_text
+    assert "Runner compatibility" in result.content_text
+    assert "Related changelog posts" not in result.content_text
+    assert "Share this update" not in result.content_text
+
+
 def test_keeps_reading_structure_and_normalizes_links() -> None:
     html = f"""
     <article>
