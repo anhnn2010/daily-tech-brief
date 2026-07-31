@@ -10,7 +10,13 @@ class ConfigError(ValueError):
 
 
 class FeedFetchError(RuntimeError):
-    """Raised when a feed cannot be downloaded or parsed."""
+    """Raised when an article source cannot be downloaded or parsed."""
+
+
+_PROVIDER_FORMATS: dict[str, frozenset[str]] = {
+    "feed": frozenset({"rss", "atom"}),
+    "html_index": frozenset({"html"}),
+}
 
 
 @dataclass(frozen=True)
@@ -44,7 +50,8 @@ class Source:
         missing = sorted(required - data.keys())
         if missing:
             raise ConfigError(
-                f"Source is missing required fields: {', '.join(missing)}"
+                "Source is missing required fields: "
+                + ", ".join(missing)
             )
 
         source = cls(
@@ -58,7 +65,10 @@ class Source:
             cadence=str(data["cadence"]).strip(),
             enabled=data["enabled"],
             official=data["official"],
-            tags=tuple(str(tag).strip() for tag in data.get("tags", [])),
+            tags=tuple(
+                str(tag).strip()
+                for tag in data.get("tags", [])
+            ),
         )
         source.validate()
         return source
@@ -66,41 +76,82 @@ class Source:
     def validate(self) -> None:
         if not self.id:
             raise ConfigError("Source id must not be empty")
-        if not self.id.replace("_", "").isalnum() or self.id.lower() != self.id:
+        if (
+            not self.id.replace("_", "").isalnum()
+            or self.id.lower() != self.id
+        ):
             raise ConfigError(
-                f"Source id '{self.id}' must use lowercase letters, numbers, and underscores"
+                f"Source id '{self.id}' must use lowercase "
+                "letters, numbers, and underscores"
             )
         if not self.name:
-            raise ConfigError(f"Source '{self.id}' name must not be empty")
-        if self.provider != "feed":
             raise ConfigError(
-                f"Source '{self.id}' has unsupported provider '{self.provider}'"
+                f"Source '{self.id}' name must not be empty"
             )
-        if self.format not in {"rss", "atom"}:
+
+        supported_formats = _PROVIDER_FORMATS.get(
+            self.provider
+        )
+        if supported_formats is None:
+            supported = ", ".join(
+                sorted(_PROVIDER_FORMATS)
+            )
             raise ConfigError(
-                f"Source '{self.id}' has unsupported feed format '{self.format}'"
+                f"Source '{self.id}' has unsupported provider "
+                f"'{self.provider}'. Supported providers: "
+                f"{supported}"
+            )
+
+        if self.format not in supported_formats:
+            supported = ", ".join(
+                sorted(supported_formats)
+            )
+            raise ConfigError(
+                f"Source '{self.id}' has unsupported format "
+                f"'{self.format}' for provider "
+                f"'{self.provider}'. Supported formats: "
+                f"{supported}"
             )
 
         parsed_url = urlparse(self.url)
-        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-            raise ConfigError(f"Source '{self.id}' has invalid URL '{self.url}'")
+        if (
+            parsed_url.scheme not in {"http", "https"}
+            or not parsed_url.netloc
+        ):
+            raise ConfigError(
+                f"Source '{self.id}' has invalid URL "
+                f"'{self.url}'"
+            )
 
-        if not isinstance(self.priority, int) or isinstance(self.priority, bool):
-            raise ConfigError(f"Source '{self.id}' priority must be an integer")
+        if (
+            not isinstance(self.priority, int)
+            or isinstance(self.priority, bool)
+        ):
+            raise ConfigError(
+                f"Source '{self.id}' priority must be an integer"
+            )
         if not 1 <= self.priority <= 10:
             raise ConfigError(
-                f"Source '{self.id}' priority must be between 1 and 10"
+                f"Source '{self.id}' priority must be "
+                "between 1 and 10"
             )
         if self.cadence not in {"daily", "weekly"}:
             raise ConfigError(
-                f"Source '{self.id}' cadence must be 'daily' or 'weekly'"
+                f"Source '{self.id}' cadence must be "
+                "'daily' or 'weekly'"
             )
         if not isinstance(self.enabled, bool):
-            raise ConfigError(f"Source '{self.id}' enabled must be a boolean")
+            raise ConfigError(
+                f"Source '{self.id}' enabled must be a boolean"
+            )
         if not isinstance(self.official, bool):
-            raise ConfigError(f"Source '{self.id}' official must be a boolean")
+            raise ConfigError(
+                f"Source '{self.id}' official must be a boolean"
+            )
         if not self.category:
-            raise ConfigError(f"Source '{self.id}' category must not be empty")
+            raise ConfigError(
+                f"Source '{self.id}' category must not be empty"
+            )
 
 
 @dataclass(frozen=True)
