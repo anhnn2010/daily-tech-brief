@@ -136,7 +136,13 @@ def test_main_builds_complete_static_site_with_epub(
         lambda _config, sources: collection_result,
     )
 
-    exit_code = main_module.main(["--json"])
+    exit_code = main_module.main(
+        [
+            "--config-dir",
+            str(tmp_path),
+            "--json",
+        ]
+    )
 
     assert exit_code == 0
 
