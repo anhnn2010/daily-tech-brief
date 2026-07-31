@@ -169,6 +169,18 @@ class Article:
     summary: str
     author: str | None
     fetched_at: str
+    content_html: str = ""
+    content_text: str = ""
+    content_status: str = "not_requested"
+
+    @property
+    def has_full_content(self) -> bool:
+        """Return whether the article has extracted reading content."""
+
+        return bool(
+            self.content_html.strip()
+            or self.content_text.strip()
+        )
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
