@@ -178,7 +178,10 @@ class ArticleContentExtractor:
         _remove_comments(soup)
         _remove_global_noise(soup)
 
-        candidate, selector = _select_best_candidate(soup)
+        candidate, selector = _select_best_candidate(
+            soup,
+            minimum_text_chars=self._minimum_text_chars,
+        )
         if candidate is None:
             return ExtractedContent(
                 content_html="",
@@ -319,13 +322,17 @@ def _is_suspicious(
 
 def _select_best_candidate(
     soup: BeautifulSoup,
+    *,
+    minimum_text_chars: int,
 ) -> tuple[Tag | None, str | None]:
-    candidates: list[tuple[float, int, Tag, str]] = []
+    all_candidates: list[tuple[float, int, Tag, str]] = []
     seen: set[int] = set()
 
     for selector_index, selector in enumerate(
         _CANDIDATE_SELECTORS
     ):
+        selector_candidates: list[tuple[float, Tag]] = []
+
         for candidate in soup.select(selector):
             identity = id(candidate)
             if identity in seen:
@@ -333,7 +340,7 @@ def _select_best_candidate(
 
             seen.add(identity)
             score = _score_candidate(candidate)
-            candidates.append(
+            all_candidates.append(
                 (
                     score,
                     -selector_index,
@@ -342,14 +349,34 @@ def _select_best_candidate(
                 )
             )
 
-    if not candidates:
+            text_length = len(
+                _clean_inline_text(
+                    candidate.get_text(
+                        " ",
+                        strip=True,
+                    )
+                )
+            )
+            if text_length >= minimum_text_chars:
+                selector_candidates.append(
+                    (score, candidate)
+                )
+
+        if selector_candidates:
+            _, candidate = max(
+                selector_candidates,
+                key=lambda item: item[0],
+            )
+            return candidate, selector
+
+    if not all_candidates:
         body = soup.body
         if body is None:
             return None, None
         return body, "body"
 
     _, _, candidate, selector = max(
-        candidates,
+        all_candidates,
         key=lambda item: (
             item[0],
             item[1],
