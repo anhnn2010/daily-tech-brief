@@ -190,7 +190,7 @@ def write_collection_outputs(
         "generated_at": result.completed_at,
         "article_count": len(result.articles),
         "articles": [
-            article.to_dict()
+            _public_article_dict(article)
             for article in result.articles
         ],
     }
@@ -214,6 +214,18 @@ def write_collection_outputs(
         report_payload,
     )
     return raw_articles_path, source_report_path
+
+
+def _public_article_dict(
+    article: Article,
+) -> dict[str, Any]:
+    """Serialize collection metadata without private full article content."""
+
+    data = article.to_dict()
+    data["content_html"] = ""
+    data["content_text"] = ""
+    data["content_status"] = "not_requested"
+    return data
 
 
 def _write_json_atomic(
