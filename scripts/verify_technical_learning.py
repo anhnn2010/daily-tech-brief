@@ -22,6 +22,11 @@ class VerificationResult:
     content_extracted: int
     content_fallback: int
     content_failed: int
+    content_feed: int
+    content_web: int
+    content_curated: int
+    content_summary: int
+    content_none: int
     archive_file: Path
     checked_epub_copies: tuple[Path, ...]
 
@@ -162,6 +167,11 @@ def verify_technical_learning_output(
         for article in learning_articles
     )
 
+    _verify_learning_content_origins(
+        enrichment["records"],
+        learning_titles=learning_titles,
+    )
+
     markdown = _read_text(markdown_path)
     html = _read_text(html_path)
 
@@ -229,6 +239,18 @@ def verify_technical_learning_output(
             "lesson IDs"
         )
 
+    archive_enrichment = _extract_content_enrichment(
+        archive_payload,
+        expected_total=expected_total,
+    )
+    _verify_archive_enrichment_matches(
+        current=enrichment,
+        archived=archive_enrichment,
+        archive_file=archive_file,
+    )
+
+    origins = enrichment["content_origins"]
+
     return VerificationResult(
         total_articles=article_count,
         learning_articles=len(learning_articles),
@@ -237,6 +259,11 @@ def verify_technical_learning_output(
         content_extracted=enrichment["extracted_articles"],
         content_fallback=enrichment["summary_fallback_articles"],
         content_failed=enrichment["failed_articles"],
+        content_feed=origins["feed"],
+        content_web=origins["web"],
+        content_curated=origins["curated"],
+        content_summary=origins["summary"],
+        content_none=origins["none"],
         archive_file=archive_file,
         checked_epub_copies=checked_epub_copies,
     )
@@ -246,7 +273,7 @@ def _extract_content_enrichment(
     payload: dict[str, Any],
     *,
     expected_total: int,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     summary = payload.get("summary")
     if not isinstance(summary, dict):
         raise VerificationError(
@@ -315,18 +342,51 @@ def _extract_content_enrichment(
         "summary_fallback": 0,
         "fetch_failed": 0,
     }
+    origin_counts = {
+        "feed": 0,
+        "web": 0,
+        "curated": 0,
+        "summary": 0,
+        "none": 0,
+    }
+    allowed_origins_by_status = {
+        "extracted": {"feed", "web", "curated"},
+        "summary_fallback": {"summary"},
+        "fetch_failed": {"none"},
+    }
+
     for index, record in enumerate(records):
         if not isinstance(record, dict):
             raise VerificationError(
                 f"content_enrichment.records[{index}] must be an object"
             )
+
         status = record.get("status")
         if status not in status_counts:
             raise VerificationError(
                 f"content_enrichment.records[{index}].status "
                 "is invalid"
             )
+
+        origin = record.get("content_origin")
+        if origin == "unknown":
+            raise VerificationError(
+                f"content_enrichment.records[{index}].content_origin "
+                "must not be 'unknown'"
+            )
+        if origin not in origin_counts:
+            raise VerificationError(
+                f"content_enrichment.records[{index}].content_origin "
+                "is invalid or missing"
+            )
+        if origin not in allowed_origins_by_status[status]:
+            raise VerificationError(
+                f"content_enrichment.records[{index}] has incompatible "
+                "status and content_origin"
+            )
+
         status_counts[status] += 1
+        origin_counts[origin] += 1
 
     expected_status_counts = {
         "extracted": counts["extracted_articles"],
@@ -339,7 +399,77 @@ def _extract_content_enrichment(
             "match the summary counts"
         )
 
+    if sum(origin_counts.values()) != counts["requested_articles"]:
+        raise VerificationError(
+            "Full-content enrichment origins do not add up"
+        )
+
+    counts["content_origins"] = origin_counts
+    counts["records"] = records
     return counts
+
+
+def _verify_learning_content_origins(
+    records: list[dict[str, Any]],
+    *,
+    learning_titles: tuple[str, ...],
+) -> None:
+    learning_records = [
+        record
+        for record in records
+        if record.get("source_id") == "technical_learning"
+    ]
+
+    if len(learning_records) != len(learning_titles):
+        raise VerificationError(
+            "Technical Learning enrichment records do not match "
+            "the selected learning articles"
+        )
+
+    record_titles = {
+        _require_non_empty_string(
+            record.get("title"),
+            field="Technical Learning enrichment title",
+        )
+        for record in learning_records
+    }
+    if record_titles != set(learning_titles):
+        raise VerificationError(
+            "Technical Learning enrichment titles do not match "
+            "the selected learning articles"
+        )
+
+    for record in learning_records:
+        if record.get("status") != "extracted":
+            raise VerificationError(
+                "Technical Learning content must be extracted"
+            )
+        if record.get("content_origin") != "curated":
+            raise VerificationError(
+                "Technical Learning content must use curated origin"
+            )
+
+
+def _verify_archive_enrichment_matches(
+    *,
+    current: dict[str, Any],
+    archived: dict[str, Any],
+    archive_file: Path,
+) -> None:
+    fields = (
+        "requested_articles",
+        "extracted_articles",
+        "summary_fallback_articles",
+        "failed_articles",
+        "content_origins",
+    )
+
+    for field in fields:
+        if current[field] != archived[field]:
+            raise VerificationError(
+                f"{archive_file} contains different content "
+                "enrichment data"
+            )
 
 
 def _verify_public_articles_are_summary_only(
@@ -690,6 +820,13 @@ def _result_payload(
             "extracted": result.content_extracted,
             "summary_fallback": result.content_fallback,
             "fetch_failed": result.content_failed,
+            "content_origins": {
+                "feed": result.content_feed,
+                "web": result.content_web,
+                "curated": result.content_curated,
+                "summary": result.content_summary,
+                "none": result.content_none,
+            },
         },
         "archive_file": str(result.archive_file),
         "checked_epub_copies": [
@@ -769,6 +906,14 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"- Content fetch fails: "
             f"{result.content_failed}"
+        )
+        print(
+            "- Content origins:     "
+            f"feed={result.content_feed}, "
+            f"web={result.content_web}, "
+            f"curated={result.content_curated}, "
+            f"summary={result.content_summary}, "
+            f"none={result.content_none}"
         )
         print(
             f"- Archive payload:     "

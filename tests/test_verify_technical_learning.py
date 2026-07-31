@@ -35,11 +35,15 @@ def _write_epub(
             "page-break-before: always; }"
         )
 
+    linux_full_content_count = max(
+        0,
+        full_content_count - 1,
+    )
     linux_articles: list[str] = []
     for index in range(11):
         body_class = (
             ' class="article-content full-content"'
-            if index < full_content_count
+            if index < linux_full_content_count
             else ""
         )
         body = (
@@ -56,10 +60,16 @@ def _write_epub(
             "</article>"
         )
 
+    learning_body = (
+        '<div class="article-content full-content">'
+        '<p>Curated learning body</p></div>'
+        if full_content_count > 0
+        else '<p class="summary">Learning summary</p>'
+    )
     learning_article = (
         "<article>"
         f"<h2>{title}</h2>"
-        '<p class="summary">Learning summary</p>'
+        f"{learning_body}"
         '<p><a href="https://example.com/pll">'
         f"{source_label}</a></p>"
         "</article>"
@@ -81,21 +91,38 @@ def _write_epub(
 
 
 def _content_enrichment() -> dict[str, object]:
-    records = []
-    statuses = (
-        ["extracted"] * 2
-        + ["summary_fallback"] * 8
-        + ["fetch_failed"] * 2
-    )
-    for index, status in enumerate(statuses):
+    records: list[dict[str, object]] = []
+
+    for index in range(11):
+        if index == 0:
+            status = "extracted"
+            origin = "web"
+        elif index < 9:
+            status = "summary_fallback"
+            origin = "summary"
+        else:
+            status = "fetch_failed"
+            origin = "none"
+
         records.append(
             {
                 "source_id": f"source-{index}",
                 "title": f"Article {index}",
                 "url": f"https://example.com/{index}",
                 "status": status,
+                "content_origin": origin,
             }
         )
+
+    records.append(
+        {
+            "source_id": "technical_learning",
+            "title": "Phase-Locked Loop Fundamentals",
+            "url": "https://example.com/pll",
+            "status": "extracted",
+            "content_origin": "curated",
+        }
+    )
 
     return {
         "requested_articles": 12,
@@ -211,6 +238,11 @@ def test_verifies_learning_and_full_text_epub_output(
     assert result.content_extracted == 2
     assert result.content_fallback == 8
     assert result.content_failed == 2
+    assert result.content_feed == 0
+    assert result.content_web == 1
+    assert result.content_curated == 1
+    assert result.content_summary == 8
+    assert result.content_none == 2
 
 
 def test_accepts_legacy_nested_processing_summary(
@@ -408,6 +440,130 @@ def test_rejects_mismatched_published_epub_copy(
         )
 
 
+def test_rejects_missing_content_origin(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    del payload["summary"]["content_enrichment"]["records"][0][
+        "content_origin"
+    ]
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="content_origin is invalid or missing",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_unknown_content_origin(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    payload["summary"]["content_enrichment"]["records"][0][
+        "content_origin"
+    ] = "unknown"
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="must not be 'unknown'",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_incompatible_status_and_origin(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    payload["summary"]["content_enrichment"]["records"][1][
+        "content_origin"
+    ] = "web"
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="incompatible status and content_origin",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_non_curated_learning_origin(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    payload["summary"]["content_enrichment"]["records"][11][
+        "content_origin"
+    ] = "web"
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="must use curated origin",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_archive_enrichment_origin_mismatch(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    archive_files = list(
+        (site_dir / "archive").rglob("ranked_articles.json")
+    )
+    assert len(archive_files) == 1
+
+    payload = json.loads(
+        archive_files[0].read_text(encoding="utf-8")
+    )
+    payload["summary"]["content_enrichment"]["records"][0][
+        "content_origin"
+    ] = "feed"
+    archive_files[0].write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match="different content enrichment data",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
 def test_main_prints_full_content_json_summary(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -434,4 +590,11 @@ def test_main_prints_full_content_json_summary(
         "extracted": 2,
         "summary_fallback": 8,
         "fetch_failed": 2,
+        "content_origins": {
+            "feed": 0,
+            "web": 1,
+            "curated": 1,
+            "summary": 8,
+            "none": 2,
+        },
     }
