@@ -104,6 +104,11 @@ def _make_config(tmp_path: Path) -> ProjectConfig:
                     "weight": 9,
                     "daily_quota": 1,
                 },
+                "technical_learning": {
+                    "label": "Technical Learning",
+                    "weight": 10,
+                    "daily_quota": 0,
+                },
             },
             "keywords": {
                 "high_priority": ["pll", "current mirror"],
@@ -210,6 +215,7 @@ def test_processing_reserves_one_slot_for_learning(
     assert len(news_articles) == 11
     assert len(learning_articles) == 1
     assert learning_articles[0]["external_id"] == "learning:lesson_a"
+    assert learning_articles[0]["category"] == "technical_learning"
     assert payload["learning"]["lesson_ids"] == ["lesson_a"]
     assert summary["selected_news_articles"] == 11
     assert summary["selected_learning_articles"] == 1

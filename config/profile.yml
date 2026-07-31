@@ -28,6 +28,10 @@ categories:
     label: Analog / Mixed-Signal
     weight: 10
     daily_quota: 1
+  technical_learning:
+    label: Technical Learning
+    weight: 10
+    daily_quota: 0
   semiconductor:
     label: Semiconductor
     weight: 10

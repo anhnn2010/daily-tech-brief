@@ -80,7 +80,7 @@ def test_converts_analog_lesson_to_article() -> None:
 
     assert article.source_id == "technical_learning"
     assert article.source_name == "Analog Devices"
-    assert article.category == "analog_mixed_signal"
+    assert article.category == "technical_learning"
     assert article.source_priority == 10
     assert article.title == "Phase-Locked Loop Fundamentals"
     assert article.url == "https://example.com/pll-fundamentals"
@@ -105,17 +105,47 @@ def test_converts_analog_lesson_to_article() -> None:
     assert article.summary.endswith("Difficulty: intermediate.")
 
 
-def test_maps_post_silicon_track_to_test_engineering() -> None:
+@pytest.mark.parametrize(
+    ("lesson_id", "track", "topics"),
+    [
+        (
+            "current_mirror_types",
+            "analog_foundations",
+            ("current_mirror", "biasing"),
+        ),
+        (
+            "pll_fundamentals",
+            "pll_and_clocking",
+            ("pll", "clocking"),
+        ),
+        (
+            "adc_error_budget",
+            "data_converters",
+            ("adc", "inl"),
+        ),
+        (
+            "device_validation",
+            "post_silicon_test",
+            ("validation", "ate"),
+        ),
+    ],
+)
+def test_maps_all_learning_tracks_to_technical_learning(
+    lesson_id: str,
+    track: str,
+    topics: tuple[str, ...],
+) -> None:
     article = learning_lesson_to_article(
         _lesson(
-            lesson_id="device_validation",
-            track="post_silicon_test",
-            topics=("validation", "ate"),
+            lesson_id=lesson_id,
+            track=track,
+            topics=topics,
         ),
         generated_at=datetime(2026, 7, 31, tzinfo=timezone.utc),
     )
 
-    assert article.category == "test_engineering"
+    assert article.category == "technical_learning"
+    assert f"learning_track:{track}" in article.source_tags
 
 
 def test_converts_multiple_lessons_in_original_order() -> None:

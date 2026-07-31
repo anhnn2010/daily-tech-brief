@@ -11,10 +11,10 @@ LEARNING_EXTERNAL_ID_PREFIX = "learning:"
 LEARNING_LESSON_TAG_PREFIX = "learning_lesson_id:"
 
 DEFAULT_CATEGORY_BY_TRACK: dict[str, str] = {
-    "analog_foundations": "analog_mixed_signal",
-    "pll_and_clocking": "analog_mixed_signal",
-    "data_converters": "analog_mixed_signal",
-    "post_silicon_test": "test_engineering",
+    "analog_foundations": "technical_learning",
+    "pll_and_clocking": "technical_learning",
+    "data_converters": "technical_learning",
+    "post_silicon_test": "technical_learning",
 }
 
 
