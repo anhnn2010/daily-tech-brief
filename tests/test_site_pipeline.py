@@ -204,7 +204,8 @@ def test_main_builds_complete_static_site_with_epub(
             "utf-8"
         )
         assert "Arch Linux workflow update" in chapter
-        assert "Read the original article" in chapter
+        assert "Read the original article" not in chapter
+        assert "Original source" in chapter
 
     rendering = execution_summary["processing"]["rendering"]
     epub_summary = rendering["epub"]
