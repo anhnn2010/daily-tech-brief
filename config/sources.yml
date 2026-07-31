@@ -63,6 +63,18 @@ sources:
     official: true
     tags: [jenkins, pipeline, plugins, ci]
 
+  - id: n8n_blog
+    name: n8n Blog
+    provider: feed
+    format: rss
+    url: https://blog.n8n.io/rss/
+    category: automation_ci
+    priority: 9
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [workflow_automation, integrations, ai_agents, freelance]
+
   - id: docker_blog
     name: Docker Blog
     provider: feed
@@ -74,6 +86,18 @@ sources:
     enabled: true
     official: true
     tags: [containers, build, devops]
+
+  - id: gitlab_blog
+    name: GitLab Blog
+    provider: feed
+    format: atom
+    url: https://about.gitlab.com/atom.xml
+    category: automation_ci
+    priority: 8
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [gitlab_ci, runners, devsecops, release_automation]
 
   # Python
   - id: python_insider
@@ -87,6 +111,42 @@ sources:
     enabled: true
     official: true
     tags: [cpython, releases, packaging, security]
+
+  - id: fastapi_releases
+    name: FastAPI Releases
+    provider: feed
+    format: atom
+    url: https://github.com/fastapi/fastapi/releases.atom
+    category: python
+    priority: 9
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [api_backend, rest_api, pydantic, freelance]
+
+  - id: scrapy_releases
+    name: Scrapy Releases
+    provider: feed
+    format: atom
+    url: https://github.com/scrapy/scrapy/releases.atom
+    category: python
+    priority: 9
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [web_scraping, crawling, data_extraction, freelance]
+
+  - id: pymupdf_releases
+    name: PyMuPDF Releases
+    provider: feed
+    format: atom
+    url: https://github.com/pymupdf/PyMuPDF/releases.atom
+    category: python
+    priority: 9
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [pdf, document_automation, data_extraction, freelance]
 
   # The official Atom feed currently returns HTTP 403 to automated clients.
   # Keep the entry for future re-checks, but do not fetch it by default.
@@ -164,6 +224,18 @@ sources:
     official: true
     tags: [engineering, open_source, security, developer_tools]
 
+  - id: cncf_blog
+    name: CNCF Blog
+    provider: feed
+    format: rss
+    url: https://www.cncf.io/feed/
+    category: open_source
+    priority: 8
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [kubernetes, cloud_native, platform_engineering, observability]
+
   # Semiconductor / test engineering
   - id: synopsys_news
     name: Synopsys News Releases
@@ -189,6 +261,42 @@ sources:
     official: true
     tags: [verification, pcie, cxl, ucie, serdes]
 
+  - id: pytest_releases
+    name: pytest Releases
+    provider: feed
+    format: atom
+    url: https://github.com/pytest-dev/pytest/releases.atom
+    category: test_engineering
+    priority: 10
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [pytest, test_automation, plugins, freelance]
+
+  - id: playwright_python_releases
+    name: Playwright Python Releases
+    provider: feed
+    format: atom
+    url: https://github.com/microsoft/playwright-python/releases.atom
+    category: test_engineering
+    priority: 9
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [browser_automation, e2e, web_testing, freelance]
+
+  - id: siemens_verification_horizons
+    name: Siemens Verification Horizons
+    provider: feed
+    format: rss
+    url: https://blogs.sw.siemens.com/verificationhorizons/feed/
+    category: test_engineering
+    priority: 9
+    cadence: daily
+    enabled: true
+    official: true
+    tags: [formal_verification, uvm, dft, hardware_verification]
+
   - id: cadence_corporate
     name: Cadence Corporate News
     provider: feed
@@ -201,7 +309,7 @@ sources:
     official: true
     tags: [eda, chiplets, ai_for_design, industry]
 
-  # Ebook
+  # Ebook / document automation
   - id: koreader_releases
     name: KOReader Releases
     provider: feed
@@ -213,6 +321,30 @@ sources:
     enabled: true
     official: true
     tags: [koreader, kobo, plugins, releases]
+
+  - id: readest_releases
+    name: Readest Releases
+    provider: feed
+    format: atom
+    url: https://github.com/readest/readest/releases.atom
+    category: ebook
+    priority: 9
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [readest, epub, tts, sync]
+
+  - id: ocrmypdf_releases
+    name: OCRmyPDF Releases
+    provider: feed
+    format: atom
+    url: https://github.com/ocrmypdf/OCRmyPDF/releases.atom
+    category: ebook
+    priority: 9
+    cadence: weekly
+    enabled: true
+    official: true
+    tags: [ocr, pdf, document_automation, tesseract]
 
   - id: calibre_releases
     name: calibre Releases
