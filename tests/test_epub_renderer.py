@@ -50,6 +50,9 @@ def make_ranked_article(
     author: str | None = None,
     score: int = 50,
     matched_keywords: tuple[str, ...] = (),
+    content_html: str = "",
+    content_text: str = "",
+    content_status: str = "not_requested",
 ) -> RankedArticle:
     article = Article(
         source_id="example_source",
@@ -65,6 +68,9 @@ def make_ranked_article(
         summary=summary,
         author=author,
         fetched_at="2026-07-30T04:00:00Z",
+        content_html=content_html,
+        content_text=content_text,
+        content_status=content_status,
     )
     return RankedArticle(
         article=article,
@@ -242,13 +248,133 @@ def test_renderer_keeps_long_url_out_of_spoken_text() -> None:
         )
 
         assert long_url not in visible_text
-        assert "Read the original article" in visible_text
+        assert "Read the original article" not in visible_text
+        assert "Original source" in visible_text
         assert "Score 99" not in visible_text
         assert "koreader" not in visible_text
         assert "text to speech" not in visible_text
         assert "Ranking detail that must not be spoken." not in visible_text
         assert long_url.replace("&", "&amp;") in chapter
 
+
+
+def test_renderer_prefers_full_html_content_over_summary() -> None:
+    epub_bytes = render_epub_digest(
+        [
+            make_ranked_article(
+                summary="Summary that must not be rendered.",
+                content_html=(
+                    "<h2>Loop architecture</h2>"
+                    "<p>Full <strong>PLL</strong> article body.</p>"
+                    "<ul><li>Phase detector</li><li>VCO</li></ul>"
+                ),
+                content_text="Plain-text fallback that must not be rendered.",
+                content_status="extracted",
+            )
+        ],
+        make_profile(),
+        generated_at="2026-07-30T04:00:00Z",
+    )
+
+    with open_epub(epub_bytes) as epub:
+        chapter = read_text(epub, "EPUB/category-linux.xhtml")
+        visible_text = " ".join(
+            text.strip()
+            for text in ElementTree.fromstring(chapter).itertext()
+            if text.strip()
+        )
+
+        assert '<div class="article-content full-content">' in chapter
+        assert "<h2>Loop architecture</h2>" in chapter
+        assert "<strong>PLL</strong>" in chapter
+        assert "<li>Phase detector</li>" in chapter
+        assert "Summary that must not be rendered." not in visible_text
+        assert "Plain-text fallback that must not be rendered." not in visible_text
+        assert "Original source" in visible_text
+        assert "Read the original article" not in visible_text
+        assert_well_formed_xml(epub, "EPUB/category-linux.xhtml")
+
+
+def test_renderer_uses_plain_text_when_full_html_is_unusable() -> None:
+    epub_bytes = render_epub_digest(
+        [
+            make_ranked_article(
+                summary="Summary fallback.",
+                content_html="\x00",
+                content_text="First full paragraph.\n\nSecond full paragraph.",
+                content_status="extracted",
+            )
+        ],
+        make_profile(),
+        generated_at="2026-07-30T04:00:00Z",
+    )
+
+    with open_epub(epub_bytes) as epub:
+        chapter = read_text(epub, "EPUB/category-linux.xhtml")
+
+        assert (
+            '<div class="article-content full-content text-content">'
+            in chapter
+        )
+        assert "<p>First full paragraph.</p>" in chapter
+        assert "<p>Second full paragraph.</p>" in chapter
+        assert "Summary fallback." not in chapter
+        assert_well_formed_xml(epub, "EPUB/category-linux.xhtml")
+
+
+def test_renderer_falls_back_to_summary_without_full_content() -> None:
+    epub_bytes = render_epub_digest(
+        [
+            make_ranked_article(
+                summary="Summary fallback content.",
+                content_status="fetch_failed",
+            )
+        ],
+        make_profile(),
+        generated_at="2026-07-30T04:00:00Z",
+    )
+
+    with open_epub(epub_bytes) as epub:
+        chapter = read_text(epub, "EPUB/category-linux.xhtml")
+
+        assert (
+            '<p class="summary">Summary fallback content.</p>'
+            in chapter
+        )
+        assert "Original source" in chapter
+        assert "Read the original article" not in chapter
+
+
+def test_renderer_starts_each_later_article_on_a_new_page() -> None:
+    epub_bytes = render_epub_digest(
+        [
+            make_ranked_article(
+                title="First article",
+                url="https://example.com/first",
+            ),
+            make_ranked_article(
+                title="Second article",
+                url="https://example.com/second",
+            ),
+        ],
+        make_profile(),
+        generated_at="2026-07-30T04:00:00Z",
+    )
+
+    with open_epub(epub_bytes) as epub:
+        stylesheet = read_text(epub, "EPUB/styles.css")
+        chapter = read_text(epub, "EPUB/category-linux.xhtml")
+
+        assert "article + article {" in stylesheet
+        assert "break-before: page;" in stylesheet
+        assert "page-break-before: always;" in stylesheet
+        assert "break-inside: auto;" in stylesheet
+        assert "page-break-inside: auto;" in stylesheet
+        assert chapter.index('id="article-1"') < chapter.index(
+            'id="article-2"'
+        )
+        assert "First article" in chapter
+        assert "Second article" in chapter
 
 def test_renderer_normalizes_summary_and_formats_article_metadata() -> None:
     epub_bytes = render_epub_digest(
