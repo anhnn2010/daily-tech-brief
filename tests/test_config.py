@@ -16,6 +16,7 @@ OPTIONAL_FEATURES = (
     "render_markdown",
     "render_html",
     "render_epub",
+    "full_content_epub",
     "build_site",
     "ai_editor",
 )
@@ -87,6 +88,8 @@ def test_bundled_configuration_is_valid() -> None:
     assert runtime["output_dir"] == "output"
     assert runtime["site_dir"] == "site"
     assert runtime["user_agent"] == "DailyTechBrief/0.7.0"
+    assert runtime["content_timeout_seconds"] == 15
+    assert runtime["content_max_download_bytes"] == 5_000_000
 
     assert config.settings["features"] == {
         "fetch_feeds": True,
@@ -94,6 +97,7 @@ def test_bundled_configuration_is_valid() -> None:
         "render_markdown": True,
         "render_html": True,
         "render_epub": True,
+        "full_content_epub": True,
         "build_site": True,
         "ai_editor": False,
     }
@@ -207,6 +211,36 @@ def test_fetch_feeds_feature_is_required(tmp_path: Path) -> None:
         ConfigError,
         match=r"features\.fetch_feeds must be a boolean",
     ):
+        load_project_config(config_dir)
+
+
+@pytest.mark.parametrize(
+    ("runtime_name", "invalid_value", "message"),
+    [
+        (
+            "content_timeout_seconds",
+            0,
+            "runtime.content_timeout_seconds must be greater than zero",
+        ),
+        (
+            "content_max_download_bytes",
+            0,
+            "runtime.content_max_download_bytes must be a positive integer",
+        ),
+    ],
+)
+def test_optional_content_runtime_settings_are_validated(
+    tmp_path: Path,
+    runtime_name: str,
+    invalid_value: int,
+    message: str,
+) -> None:
+    config_dir = _copy_bundled_config(tmp_path)
+    settings = _read_settings(config_dir)
+    settings["runtime"][runtime_name] = invalid_value
+    _write_settings(config_dir, settings)
+
+    with pytest.raises(ConfigError, match=message):
         load_project_config(config_dir)
 
 

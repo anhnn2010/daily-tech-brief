@@ -122,6 +122,13 @@ def _validate_settings(settings_data: dict[str, Any]) -> None:
 
     _require_positive_number(runtime, "lookback_hours")
     _require_positive_number(runtime, "request_timeout_seconds")
+
+    if "content_timeout_seconds" in runtime:
+        _require_positive_number(runtime, "content_timeout_seconds")
+
+    if "content_max_download_bytes" in runtime:
+        _require_positive_integer(runtime, "content_max_download_bytes")
+
     _require_positive_integer(runtime, "max_articles")
     _require_positive_integer(runtime, "max_summary_chars")
     _require_non_empty_string(runtime, "output_dir", prefix="runtime")
@@ -141,6 +148,7 @@ def _validate_settings(settings_data: dict[str, Any]) -> None:
         "render_markdown",
         "render_html",
         "render_epub",
+        "full_content_epub",
         "build_site",
         "ai_editor",
     ):
