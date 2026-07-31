@@ -1,5 +1,4 @@
 schema_version: 1
-
 selection:
   enabled: true
   daily_count: 1
@@ -7,276 +6,784 @@ selection:
   include_in_max_articles: true
   history_source: site_archive
   timezone: Asia/Ho_Chi_Minh
-
 lessons:
-  - id: current_mirror_types
-    order: 10
-    title: Learn Analog Circuits — Current Mirror Types and Applications
-    source_name: All About Circuits
-    url: https://www.allaboutcircuits.com/technical-articles/learn-analog-circuits-introduction-to-current-mirrors-types-applications/
-    track: analog_foundations
-    topics: [current_mirror, biasing, bjt, analog_building_blocks]
-    difficulty: intermediate
-    estimated_minutes: 18
-    summary: >
-      Introduces basic, beta-helper, Widlar, and Wilson current mirrors,
-      including the assumptions and errors that affect mirrored current.
-    why_it_matters: >
-      Bias-current generation appears throughout analog cores, references,
-      PLL charge pumps, amplifiers, and calibration paths.
-    enabled: true
+- id: current_mirror_types
+  order: 10
+  title: Learn Analog Circuits — Current Mirror Types and Applications
+  source_name: All About Circuits
+  url: https://www.allaboutcircuits.com/technical-articles/learn-analog-circuits-introduction-to-current-mirrors-types-applications/
+  track: analog_foundations
+  topics:
+  - current_mirror
+  - biasing
+  - bjt
+  - analog_building_blocks
+  difficulty: intermediate
+  estimated_minutes: 18
+  summary: 'Introduces basic, beta-helper, Widlar, and Wilson current mirrors, including the assumptions
+    and errors that affect mirrored current.
 
-  - id: bandgap_reference_intro
-    order: 20
-    title: Introduction to Bandgap Voltage References
-    source_name: All About Circuits
-    url: https://www.allaboutcircuits.com/technical-articles/introduction-to-bandgap-voltage-references/
-    track: analog_foundations
-    topics: [bandgap_reference, ptat, ctat, temperature, voltage_reference]
-    difficulty: intermediate
-    estimated_minutes: 20
-    summary: >
-      Explains how PTAT and CTAT behavior are combined to generate a
-      temperature-stable reference voltage.
-    why_it_matters: >
-      Bandgap references are central to analog biasing, ADC and DAC accuracy,
-      LDO regulation, trimming, and temperature characterization.
-    enabled: true
+    '
+  why_it_matters: 'Bias-current generation appears throughout analog cores, references, PLL charge pumps,
+    amplifiers, and calibration paths.
 
-  - id: voltage_reference_fundamentals
-    order: 30
-    title: Understanding and Applying Voltage References
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/app-notes/an-82f.html
-    track: analog_foundations
-    topics: [voltage_reference, bandgap_reference, noise, drift, stability]
-    difficulty: intermediate
-    estimated_minutes: 30
-    summary: >
-      Reviews bandgap and buried-Zener reference technologies, including
-      temperature coefficient, noise, long-term stability, and practical use.
-    why_it_matters: >
-      Reference quality directly affects converter accuracy, calibration
-      limits, and measured behavior across voltage and temperature.
-    enabled: true
+    '
+  enabled: true
+  content_html: |-
+    <h2>Why current mirrors matter</h2>
 
-  - id: ldo_application
-    order: 40
-    title: How to Successfully Apply Low-Dropout Regulators
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/analog-dialogue/articles/applying-low-dropout-regulators.html
-    track: analog_foundations
-    topics: [ldo, psrr, noise, stability, startup]
-    difficulty: intermediate
-    estimated_minutes: 25
-    summary: >
-      Covers LDO operating regions, stability, startup, noise, power-supply
-      rejection, and the influence of input and load conditions.
-    why_it_matters: >
-      PLLs, ADCs, references, and analog cores are often sensitive to supply
-      noise and regulator startup behavior during silicon bring-up.
-    enabled: true
+    <p>
+    A current mirror is one of the most common building blocks in analog integrated
+    circuits. Its job is simple: establish a reference current in one branch and
+    reproduce a related current in one or more output branches. The mirrored current
+    can bias an amplifier, set the tail current of a differential pair, charge a PLL
+    loop filter, provide a reference for a comparator, or feed another bias network.
+    </p>
 
-  - id: pll_fundamentals
-    order: 50
-    title: Phase-Locked Loop Fundamentals
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/analog-dialogue/articles/phase-locked-loop-pll-fundamentals.html
-    track: pll_and_clocking
-    topics: [pll, pfd, charge_pump, vco, divider, loop_filter]
-    difficulty: intermediate
-    estimated_minutes: 30
-    summary: >
-      Introduces the main PLL blocks and explains how the closed loop controls
-      frequency and phase while shaping noise from different contributors.
-    why_it_matters: >
-      This provides the system-level map needed to debug lock failures,
-      frequency errors, noisy clocks, and calibration interactions.
-    enabled: true
+    <p>
+    The name <em>mirror</em> is useful, but it can also be misleading. A practical
+    current mirror never copies current perfectly. Device mismatch, finite output
+    resistance, limited voltage headroom, temperature, and process variation all
+    create error. Good circuit design begins by understanding which error dominates
+    in the intended operating region.
+    </p>
 
-  - id: pll_design_debug
-    order: 60
-    title: How to Design and Debug a Phase-Locked Loop Circuit
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/analog-dialogue/articles/design-debug-a-pll-circuit.html
-    track: pll_and_clocking
-    topics: [pll, debug, loop_filter, phase_noise, reference_spur]
-    difficulty: advanced
-    estimated_minutes: 30
-    summary: >
-      Presents a structured PLL design and debug method, including architecture
-      selection, loop-filter checks, phase noise, and spur investigation.
-    why_it_matters: >
-      A systematic debug sequence is valuable when post-silicon symptoms can
-      originate from configuration, reference, supply, loop, or VCO behavior.
-    enabled: true
+    <h2>The basic two-transistor mirror</h2>
 
-  - id: type2_pll
-    order: 70
-    title: Introduction to Second-Order Type-2 PLLs
-    source_name: All About Circuits
-    url: https://www.allaboutcircuits.com/technical-articles/introduction-to-second-order-type-2-plls/
-    track: pll_and_clocking
-    topics: [pll, type2_pll, loop_filter, stability, bandwidth]
-    difficulty: advanced
-    estimated_minutes: 22
-    summary: >
-      Explains Type-2 PLL behavior and how loop-filter choices affect tracking,
-      steady-state error, bandwidth, and stability.
-    why_it_matters: >
-      Loop type and order help explain lock time, overshoot, stability margin,
-      and why a PLL may pass at one operating point but fail elsewhere.
-    enabled: true
+    <p>
+    A simple MOS current mirror uses two matched transistors. The first transistor
+    is diode-connected: its gate and drain are tied together. A reference current
+    flows through this branch and establishes the required gate-to-source voltage.
+    The second transistor shares the same gate voltage. If both devices have the
+    same geometry and operate in saturation, the second branch ideally carries the
+    same current.
+    </p>
 
-  - id: phase_noise_jitter
-    order: 80
-    title: Phase Noise and Jitter — Theory, Analysis, and Measurement
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/app-notes/an-1067.html
-    track: pll_and_clocking
-    topics: [phase_noise, jitter, psd, clock, measurement]
-    difficulty: advanced
-    estimated_minutes: 35
-    summary: >
-      Connects phase-noise spectral density to time-domain jitter and discusses
-      practical analysis and measurement considerations.
-    why_it_matters: >
-      Post-silicon clock and converter performance often requires translating
-      spectrum measurements into jitter and system-level SNR impact.
-    enabled: true
+    <p>
+    For a long-channel MOS device in saturation, a simplified relationship is:
+    </p>
 
-  - id: adc_dac_types
-    order: 90
-    title: Types of ADCs and DACs
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/technical-articles/types-of-adcs-and-dacs.html
-    track: data_converters
-    topics: [adc, dac, architecture, resolution, dnl, inl]
-    difficulty: intermediate
-    estimated_minutes: 25
-    summary: >
-      Surveys common converter architectures and introduces resolution,
-      monotonicity, missing codes, DNL, and INL.
-    why_it_matters: >
-      Converter architecture determines which measurements, calibration
-      methods, and failure signatures are most meaningful during validation.
-    enabled: true
+    <pre><code>I_D ≈ (1/2) · μ · C_ox · (W/L) · (V_GS − V_TH)^2
+    </code></pre>
 
-  - id: adc_error_budget
-    order: 100
-    title: How ADC Errors Affect System Performance
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/technical-articles/the-abcs-of-analog-to-digital-converters-how-adc-errors-affect-system-performance.html
-    track: data_converters
-    topics: [adc, offset_error, gain_error, dnl, inl, error_budget]
-    difficulty: intermediate
-    estimated_minutes: 25
-    summary: >
-      Explains offset, gain, DNL, INL, and resolution errors and relates them
-      to practical system-level accuracy.
-    why_it_matters: >
-      Separating error components helps decide whether a mismatch comes from
-      silicon, calibration, reference, setup, or the measurement method.
-    enabled: true
+    <p>
+    If the two devices share the same process parameters and gate voltage, their
+    current ratio is mainly set by geometry:
+    </p>
 
-  - id: high_speed_adc_testing
-    order: 110
-    title: Understanding High-Speed ADC Testing and Evaluation
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/app-notes/an-835.html
-    track: data_converters
-    topics: [adc, snr, sfdr, fft, dnl, inl, test_method]
-    difficulty: advanced
-    estimated_minutes: 40
-    summary: >
-      Reviews static and dynamic ADC tests, including histogram methods,
-      spectral analysis, SNR, SFDR, and setup requirements.
-    why_it_matters: >
-      Measurement setup, coherent sampling, signal quality, and analysis
-      choices can create apparent silicon failures or hide real ones.
-    enabled: true
+    <pre><code>I_OUT / I_REF ≈ (W/L)_OUT / (W/L)_REF
+    </code></pre>
 
-  - id: inl_dnl_measurement
-    order: 120
-    title: INL and DNL Measurements for High-Speed ADCs
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/technical-articles/inldnl-measurements-for-types-of-highspeed-adcs.html
-    track: data_converters
-    topics: [adc, inl, dnl, histogram, code_density, measurement]
-    difficulty: advanced
-    estimated_minutes: 25
-    summary: >
-      Reviews INL and DNL definitions and describes practical techniques for
-      measuring converter linearity.
-    why_it_matters: >
-      Linearity data is commonly used for characterization, binning,
-      calibration validation, and identifying systematic code errors.
-    enabled: true
+    <p>
+    This makes current scaling straightforward. An output transistor twice as wide
+    as the reference device ideally produces twice the current. Multiple output
+    devices can also share the same gate voltage to distribute one reference current
+    to several analog blocks.
+    </p>
 
-  - id: ate_dac_calibration
-    order: 130
-    title: Level-Setting DAC Calibration for ATE Pin Electronics
-    source_name: Analog Devices
-    url: https://www.analog.com/en/resources/analog-dialogue/articles/level-setting-dac-calibration-for-ate-pin-electronics.html
-    track: post_silicon_test
-    topics: [ate, dac, calibration, gain_error, offset_error, dnl, inl]
-    difficulty: advanced
-    estimated_minutes: 28
-    summary: >
-      Describes calibration of DAC-based ATE resources, including gain,
-      offset, INL, and DNL considerations.
-    why_it_matters: >
-      Post-silicon results depend on both DUT behavior and instrument or ATE
-      accuracy; calibration separates those two error sources.
-    enabled: true
+    <h2>Operating conditions that must be satisfied</h2>
 
-  - id: device_validation_frontier
-    order: 140
-    title: Device Validation — The Ultimate Test Frontier
-    source_name: Semiconductor Engineering
-    url: https://semiengineering.com/device-validation-the-ultimate-test-frontier/
-    track: post_silicon_test
-    topics: [post_silicon, validation, characterization, ate, production_test]
-    difficulty: intermediate
-    estimated_minutes: 18
-    summary: >
-      Discusses the role of first-silicon bring-up, characterization,
-      functional validation, ATE, structural test, and system-level test.
-    why_it_matters: >
-      It places bench automation and characterization work within the larger
-      silicon lifecycle from bring-up to production.
-    enabled: true
+    <p>
+    The simple mirror works only when both transistors remain in the intended
+    operating region. For a MOS mirror, the output device normally needs enough
+    drain-to-source voltage to stay in saturation:
+    </p>
 
-  - id: analog_adaptive_test
-    order: 150
-    title: Why Analog and Mixed-Signal Chips Resist Adaptive Test
-    source_name: Semiconductor Engineering
-    url: https://semiengineering.com/why-analog-and-mixed-signal-chips-resist-adaptive-test/
-    track: post_silicon_test
-    topics: [analog_test, adaptive_test, guard_band, characterization, data_quality]
-    difficulty: advanced
-    estimated_minutes: 20
-    summary: >
-      Explains why analog measurements, marginal behavior, contact quality,
-      guard bands, and limited data complicate adaptive-test decisions.
-    why_it_matters: >
-      It connects measurement integrity, outliers, limits, and test reduction
-      to real production and characterization risks.
-    enabled: true
+    <pre><code>V_DS,OUT ≥ V_OV
 
-  - id: shmoo_and_silent_errors
-    order: 160
-    title: Why Silent Data Errors Are So Hard to Find
-    source_name: Semiconductor Engineering
-    url: https://semiengineering.com/why-silent-data-errors-are-so-hard-to-find/
-    track: post_silicon_test
-    topics: [shmoo, voltage, temperature, frequency, silent_error, margining]
-    difficulty: advanced
-    estimated_minutes: 20
-    summary: >
-      Examines silent data errors and describes using voltage, temperature,
-      and frequency sweeps to reproduce marginal failures.
-    why_it_matters: >
-      Shmooing and multi-dimensional margin searches are core post-silicon
-      techniques for exposing failures that normal functional tests miss.
-    enabled: true
+    where:
+
+    V_OV = V_GS − V_TH
+    </code></pre>
+
+    <p>
+    The minimum output voltage required to maintain regulation is often called the
+    <em>compliance voltage</em> or voltage headroom. If the output node drops below
+    this limit, the output transistor enters the linear region and the mirrored
+    current falls.
+    </p>
+
+    <p>
+    This is especially important in low-voltage designs. A mirror may look accurate
+    in simulation at a comfortable supply voltage but lose regulation near the
+    supply rails or during startup. Post-silicon measurements should therefore sweep
+    the output voltage, not only check one nominal point.
+    </p>
+
+    <h2>Why the copied current is not exact</h2>
+
+    <h3>Finite output resistance</h3>
+
+    <p>
+    Real transistors do not behave as ideal current sources. Channel-length
+    modulation causes drain current to change with drain voltage. A common simplified
+    model is:
+    </p>
+
+    <pre><code>I_D ≈ I_D0 · (1 + λV_DS)
+    </code></pre>
+
+    <p>
+    If the reference transistor and output transistor see different drain voltages,
+    their currents differ even when their geometries are identical. Longer channel
+    devices generally improve output resistance and current accuracy, but they use
+    more area and may reduce speed.
+    </p>
+
+    <h3>Device mismatch</h3>
+
+    <p>
+    Two nearby transistors still differ slightly in threshold voltage, mobility,
+    oxide properties, and geometry. Random mismatch becomes more important as device
+    area shrinks. Layout practices such as common-centroid placement, identical
+    orientation, dummy devices, symmetric routing, and proximity help reduce
+    systematic mismatch.
+    </p>
+
+    <p>
+    Mismatch is often more important than the ideal current equation. A design that
+    is perfect on a schematic can fail its matching target after layout if the
+    devices experience different gradients, stress, or routing resistance.
+    </p>
+
+    <h3>Reference branch error</h3>
+
+    <p>
+    The reference current source is not always ideal. It may come from a resistor,
+    bandgap-derived voltage, DAC, calibration loop, or another mirror. Any error in
+    that branch is copied to every output. Noise on the reference branch can also
+    appear in all dependent analog blocks.
+    </p>
+
+    <h3>Temperature and process variation</h3>
+
+    <p>
+    Mobility, threshold voltage, resistor values, and reference circuits change with
+    temperature and process corner. The mirror itself may accurately reproduce the
+    reference current while the reference current changes substantially across PVT.
+    It is therefore useful to separate two questions:
+    </p>
+
+    <ul>
+      <li>How accurately does the output track the reference branch?</li>
+      <li>How stable is the reference current across process, voltage, and temperature?</li>
+    </ul>
+
+    <h2>Common mirror improvements</h2>
+
+    <h3>Scaled mirror</h3>
+
+    <p>
+    A scaled mirror changes the output current by changing the transistor geometry
+    ratio. This is the simplest way to create several bias levels from one reference.
+    The ratio should be implemented carefully in layout. For example, a four-times
+    device is often built from four identical unit devices rather than one physically
+    different transistor.
+    </p>
+
+    <h3>Cascode mirror</h3>
+
+    <p>
+    A cascode mirror increases output resistance by holding the drain voltage of the
+    mirroring device more nearly constant. This reduces current variation with output
+    voltage and improves accuracy. The cost is additional voltage headroom and more
+    devices.
+    </p>
+
+    <p>
+    Cascode mirrors are attractive when high output resistance is more important than
+    wide output swing. They can become difficult in low-voltage designs because each
+    stacked transistor needs enough voltage to remain in saturation.
+    </p>
+
+    <h3>Wide-swing cascode mirror</h3>
+
+    <p>
+    Wide-swing or low-voltage cascode structures reduce the headroom required by a
+    traditional cascode. They improve usable output range while retaining much of
+    the output-resistance benefit. Their biasing is more complex and may introduce
+    additional startup concerns.
+    </p>
+
+    <h3>Wilson mirror</h3>
+
+    <p>
+    A Wilson mirror uses feedback to improve output resistance and reduce the effect
+    of transistor current gain in bipolar implementations. MOS versions also exist.
+    The structure improves accuracy but adds devices, internal nodes, and potential
+    stability or startup considerations.
+    </p>
+
+    <h3>Beta-helper mirror</h3>
+
+    <p>
+    In bipolar circuits, base currents create a systematic error because the
+    reference branch must supply current to several transistor bases. A beta-helper
+    device reduces that error by providing base drive. This improves accuracy when
+    finite transistor beta would otherwise dominate.
+    </p>
+
+    <h3>Widlar mirror</h3>
+
+    <p>
+    A Widlar mirror uses emitter degeneration to generate an output current much
+    smaller than the reference current without requiring an impractically large area
+    ratio. It is historically important in bipolar integrated circuits and remains
+    a useful example of using feedback and degeneration to set current.
+    </p>
+
+    <h2>Where current mirrors appear in larger systems</h2>
+
+    <ul>
+      <li>
+        <strong>Differential amplifiers:</strong> a mirror may set the tail current
+        or act as an active load.
+      </li>
+      <li>
+        <strong>Operational amplifiers:</strong> multiple mirrors distribute bias
+        currents to input, gain, and output stages.
+      </li>
+      <li>
+        <strong>PLLs:</strong> a matched source and sink pair may form the charge
+        pump that drives the loop filter.
+      </li>
+      <li>
+        <strong>ADCs and DACs:</strong> current-steering DACs and comparator bias
+        networks rely heavily on current matching.
+      </li>
+      <li>
+        <strong>Voltage references:</strong> mirrors copy PTAT, CTAT, or trimmed
+        reference currents into other branches.
+      </li>
+      <li>
+        <strong>Calibration engines:</strong> programmable mirrors may sweep or trim
+        internal bias conditions.
+      </li>
+    </ul>
+
+    <h2>Current mirrors in PLL charge pumps</h2>
+
+    <p>
+    A PLL charge pump requires source and sink currents that are equal in magnitude
+    when measured under comparable conditions. Any mismatch creates a static phase
+    offset and can increase reference spurs. The mismatch may depend on loop-filter
+    voltage because the source and sink devices see different drain voltages.
+    </p>
+
+    <p>
+    Important measurements include:
+    </p>
+
+    <ul>
+      <li>source current versus loop-filter voltage;</li>
+      <li>sink current versus loop-filter voltage;</li>
+      <li>source-to-sink mismatch across the usable voltage range;</li>
+      <li>current variation across supply and temperature;</li>
+      <li>leakage when both paths are nominally off;</li>
+      <li>switching transients and charge injection.</li>
+    </ul>
+
+    <p>
+    A single nominal current measurement is not enough. A current mirror can pass at
+    mid-supply yet produce serious mismatch near the upper or lower compliance limit.
+    </p>
+
+    <h2>Post-silicon validation strategy</h2>
+
+    <p>
+    When validating a current mirror or bias network, separate the measurement into
+    clear dimensions.
+    </p>
+
+    <h3>1. Nominal current</h3>
+
+    <p>
+    Measure the reference branch and each output branch at nominal supply,
+    temperature, and output voltage. Report both absolute current and ratio error.
+    </p>
+
+    <pre><code>ratio_error_percent =
+        100 · (I_OUT / I_REF − expected_ratio)
+    </code></pre>
+
+    <h3>2. Output-voltage sweep</h3>
+
+    <p>
+    Sweep the output node across its legal range. This reveals compliance limits,
+    output resistance, and transitions out of saturation. Plot current versus output
+    voltage rather than reporting only minimum and maximum values.
+    </p>
+
+    <h3>3. Supply sweep</h3>
+
+    <p>
+    Sweep the relevant analog supply. This exposes sensitivity to regulator
+    variation, insufficient headroom, startup thresholds, and hidden dependencies on
+    other bias circuits.
+    </p>
+
+    <h3>4. Temperature sweep</h3>
+
+    <p>
+    Measure cold, room, and hot conditions. Compare absolute current drift with
+    tracking error. The output may track the reference well even though both currents
+    move significantly with temperature.
+    </p>
+
+    <h3>5. Device-to-device distribution</h3>
+
+    <p>
+    One device cannot reveal random mismatch. Collect data across multiple units and
+    sites. Use mean, standard deviation, outliers, and correlation with other analog
+    measurements.
+    </p>
+
+    <h3>6. Startup and power sequencing</h3>
+
+    <p>
+    Some bias networks have valid steady-state behavior but fail to start after a
+    specific power sequence. Exercise cold power-up, warm reset, partial rail
+    cycling, and repeated startup.
+    </p>
+
+    <h3>7. Calibration interaction</h3>
+
+    <p>
+    If current is trimmed by fuses, registers, or firmware, record the code-to-current
+    transfer curve. Check monotonicity, step size, endpoint coverage, and whether the
+    selected calibration code remains valid across PVT.
+    </p>
+
+    <h2>How to debug a bad measurement</h2>
+
+    <p>
+    A measured current error does not automatically prove a silicon design bug. Use
+    a structured debug sequence:
+    </p>
+
+    <ol>
+      <li>Verify the instrument range, resolution, burden voltage, and calibration.</li>
+      <li>Confirm the intended output node voltage and compliance condition.</li>
+      <li>Check whether the reference branch itself is correct.</li>
+      <li>Measure relevant supplies and bias voltages at the same time.</li>
+      <li>Repeat with a slower settling delay.</li>
+      <li>Compare source and sink directions if switching paths are involved.</li>
+      <li>Repeat across temperature and another device.</li>
+      <li>Compare the result with simulation at the measured operating point.</li>
+    </ol>
+
+    <p>
+    Instrumentation can disturb the circuit. An ammeter introduces burden voltage,
+    and probing a high-impedance bias node can add leakage or capacitance. Whenever
+    possible, measure through a dedicated sense resistor or supported test path.
+    </p>
+
+    <h2>Useful figures of merit</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>What it tells you</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Current ratio error</td>
+          <td>How accurately the output follows the intended mirror ratio.</td>
+        </tr>
+        <tr>
+          <td>Compliance voltage</td>
+          <td>The minimum or maximum output voltage that maintains regulation.</td>
+        </tr>
+        <tr>
+          <td>Output resistance</td>
+          <td>How strongly output current changes with output voltage.</td>
+        </tr>
+        <tr>
+          <td>Temperature coefficient</td>
+          <td>How current changes across temperature.</td>
+        </tr>
+        <tr>
+          <td>Supply sensitivity</td>
+          <td>How current changes with the relevant supply rail.</td>
+        </tr>
+        <tr>
+          <td>Mismatch sigma</td>
+          <td>The device-to-device spread caused by random variation.</td>
+        </tr>
+        <tr>
+          <td>Startup success rate</td>
+          <td>Whether the bias network reliably reaches the intended state.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Practical takeaway</h2>
+
+    <p>
+    A current mirror is not merely a current-copying symbol. It is a compact analog
+    feedback structure whose behavior depends on matching, voltage headroom, output
+    resistance, reference quality, temperature, process, layout, and startup.
+    </p>
+
+    <p>
+    For post-silicon work, the most useful habit is to test the mirror as a function
+    of operating condition rather than as one scalar value. Sweep the output voltage,
+    supply, temperature, and trim code. Compare tracking error separately from
+    absolute current drift. This turns a vague “bias current is wrong” result into a
+    specific and actionable failure signature.
+    </p>
+- id: bandgap_reference_intro
+  order: 20
+  title: Introduction to Bandgap Voltage References
+  source_name: All About Circuits
+  url: https://www.allaboutcircuits.com/technical-articles/introduction-to-bandgap-voltage-references/
+  track: analog_foundations
+  topics:
+  - bandgap_reference
+  - ptat
+  - ctat
+  - temperature
+  - voltage_reference
+  difficulty: intermediate
+  estimated_minutes: 20
+  summary: 'Explains how PTAT and CTAT behavior are combined to generate a temperature-stable reference
+    voltage.
+
+    '
+  why_it_matters: 'Bandgap references are central to analog biasing, ADC and DAC accuracy, LDO regulation,
+    trimming, and temperature characterization.
+
+    '
+  enabled: true
+- id: voltage_reference_fundamentals
+  order: 30
+  title: Understanding and Applying Voltage References
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/app-notes/an-82f.html
+  track: analog_foundations
+  topics:
+  - voltage_reference
+  - bandgap_reference
+  - noise
+  - drift
+  - stability
+  difficulty: intermediate
+  estimated_minutes: 30
+  summary: 'Reviews bandgap and buried-Zener reference technologies, including temperature coefficient,
+    noise, long-term stability, and practical use.
+
+    '
+  why_it_matters: 'Reference quality directly affects converter accuracy, calibration limits, and measured
+    behavior across voltage and temperature.
+
+    '
+  enabled: true
+- id: ldo_application
+  order: 40
+  title: How to Successfully Apply Low-Dropout Regulators
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/analog-dialogue/articles/applying-low-dropout-regulators.html
+  track: analog_foundations
+  topics:
+  - ldo
+  - psrr
+  - noise
+  - stability
+  - startup
+  difficulty: intermediate
+  estimated_minutes: 25
+  summary: 'Covers LDO operating regions, stability, startup, noise, power-supply rejection, and the influence
+    of input and load conditions.
+
+    '
+  why_it_matters: 'PLLs, ADCs, references, and analog cores are often sensitive to supply noise and regulator
+    startup behavior during silicon bring-up.
+
+    '
+  enabled: true
+- id: pll_fundamentals
+  order: 50
+  title: Phase-Locked Loop Fundamentals
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/analog-dialogue/articles/phase-locked-loop-pll-fundamentals.html
+  track: pll_and_clocking
+  topics:
+  - pll
+  - pfd
+  - charge_pump
+  - vco
+  - divider
+  - loop_filter
+  difficulty: intermediate
+  estimated_minutes: 30
+  summary: 'Introduces the main PLL blocks and explains how the closed loop controls frequency and phase
+    while shaping noise from different contributors.
+
+    '
+  why_it_matters: 'This provides the system-level map needed to debug lock failures, frequency errors,
+    noisy clocks, and calibration interactions.
+
+    '
+  enabled: true
+- id: pll_design_debug
+  order: 60
+  title: How to Design and Debug a Phase-Locked Loop Circuit
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/analog-dialogue/articles/design-debug-a-pll-circuit.html
+  track: pll_and_clocking
+  topics:
+  - pll
+  - debug
+  - loop_filter
+  - phase_noise
+  - reference_spur
+  difficulty: advanced
+  estimated_minutes: 30
+  summary: 'Presents a structured PLL design and debug method, including architecture selection, loop-filter
+    checks, phase noise, and spur investigation.
+
+    '
+  why_it_matters: 'A systematic debug sequence is valuable when post-silicon symptoms can originate from
+    configuration, reference, supply, loop, or VCO behavior.
+
+    '
+  enabled: true
+- id: type2_pll
+  order: 70
+  title: Introduction to Second-Order Type-2 PLLs
+  source_name: All About Circuits
+  url: https://www.allaboutcircuits.com/technical-articles/introduction-to-second-order-type-2-plls/
+  track: pll_and_clocking
+  topics:
+  - pll
+  - type2_pll
+  - loop_filter
+  - stability
+  - bandwidth
+  difficulty: advanced
+  estimated_minutes: 22
+  summary: 'Explains Type-2 PLL behavior and how loop-filter choices affect tracking, steady-state error,
+    bandwidth, and stability.
+
+    '
+  why_it_matters: 'Loop type and order help explain lock time, overshoot, stability margin, and why a
+    PLL may pass at one operating point but fail elsewhere.
+
+    '
+  enabled: true
+- id: phase_noise_jitter
+  order: 80
+  title: Phase Noise and Jitter — Theory, Analysis, and Measurement
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/app-notes/an-1067.html
+  track: pll_and_clocking
+  topics:
+  - phase_noise
+  - jitter
+  - psd
+  - clock
+  - measurement
+  difficulty: advanced
+  estimated_minutes: 35
+  summary: 'Connects phase-noise spectral density to time-domain jitter and discusses practical analysis
+    and measurement considerations.
+
+    '
+  why_it_matters: 'Post-silicon clock and converter performance often requires translating spectrum measurements
+    into jitter and system-level SNR impact.
+
+    '
+  enabled: true
+- id: adc_dac_types
+  order: 90
+  title: Types of ADCs and DACs
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/technical-articles/types-of-adcs-and-dacs.html
+  track: data_converters
+  topics:
+  - adc
+  - dac
+  - architecture
+  - resolution
+  - dnl
+  - inl
+  difficulty: intermediate
+  estimated_minutes: 25
+  summary: 'Surveys common converter architectures and introduces resolution, monotonicity, missing codes,
+    DNL, and INL.
+
+    '
+  why_it_matters: 'Converter architecture determines which measurements, calibration methods, and failure
+    signatures are most meaningful during validation.
+
+    '
+  enabled: true
+- id: adc_error_budget
+  order: 100
+  title: How ADC Errors Affect System Performance
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/technical-articles/the-abcs-of-analog-to-digital-converters-how-adc-errors-affect-system-performance.html
+  track: data_converters
+  topics:
+  - adc
+  - offset_error
+  - gain_error
+  - dnl
+  - inl
+  - error_budget
+  difficulty: intermediate
+  estimated_minutes: 25
+  summary: 'Explains offset, gain, DNL, INL, and resolution errors and relates them to practical system-level
+    accuracy.
+
+    '
+  why_it_matters: 'Separating error components helps decide whether a mismatch comes from silicon, calibration,
+    reference, setup, or the measurement method.
+
+    '
+  enabled: true
+- id: high_speed_adc_testing
+  order: 110
+  title: Understanding High-Speed ADC Testing and Evaluation
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/app-notes/an-835.html
+  track: data_converters
+  topics:
+  - adc
+  - snr
+  - sfdr
+  - fft
+  - dnl
+  - inl
+  - test_method
+  difficulty: advanced
+  estimated_minutes: 40
+  summary: 'Reviews static and dynamic ADC tests, including histogram methods, spectral analysis, SNR,
+    SFDR, and setup requirements.
+
+    '
+  why_it_matters: 'Measurement setup, coherent sampling, signal quality, and analysis choices can create
+    apparent silicon failures or hide real ones.
+
+    '
+  enabled: true
+- id: inl_dnl_measurement
+  order: 120
+  title: INL and DNL Measurements for High-Speed ADCs
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/technical-articles/inldnl-measurements-for-types-of-highspeed-adcs.html
+  track: data_converters
+  topics:
+  - adc
+  - inl
+  - dnl
+  - histogram
+  - code_density
+  - measurement
+  difficulty: advanced
+  estimated_minutes: 25
+  summary: 'Reviews INL and DNL definitions and describes practical techniques for measuring converter
+    linearity.
+
+    '
+  why_it_matters: 'Linearity data is commonly used for characterization, binning, calibration validation,
+    and identifying systematic code errors.
+
+    '
+  enabled: true
+- id: ate_dac_calibration
+  order: 130
+  title: Level-Setting DAC Calibration for ATE Pin Electronics
+  source_name: Analog Devices
+  url: https://www.analog.com/en/resources/analog-dialogue/articles/level-setting-dac-calibration-for-ate-pin-electronics.html
+  track: post_silicon_test
+  topics:
+  - ate
+  - dac
+  - calibration
+  - gain_error
+  - offset_error
+  - dnl
+  - inl
+  difficulty: advanced
+  estimated_minutes: 28
+  summary: 'Describes calibration of DAC-based ATE resources, including gain, offset, INL, and DNL considerations.
+
+    '
+  why_it_matters: 'Post-silicon results depend on both DUT behavior and instrument or ATE accuracy; calibration
+    separates those two error sources.
+
+    '
+  enabled: true
+- id: device_validation_frontier
+  order: 140
+  title: Device Validation — The Ultimate Test Frontier
+  source_name: Semiconductor Engineering
+  url: https://semiengineering.com/device-validation-the-ultimate-test-frontier/
+  track: post_silicon_test
+  topics:
+  - post_silicon
+  - validation
+  - characterization
+  - ate
+  - production_test
+  difficulty: intermediate
+  estimated_minutes: 18
+  summary: 'Discusses the role of first-silicon bring-up, characterization, functional validation, ATE,
+    structural test, and system-level test.
+
+    '
+  why_it_matters: 'It places bench automation and characterization work within the larger silicon lifecycle
+    from bring-up to production.
+
+    '
+  enabled: true
+- id: analog_adaptive_test
+  order: 150
+  title: Why Analog and Mixed-Signal Chips Resist Adaptive Test
+  source_name: Semiconductor Engineering
+  url: https://semiengineering.com/why-analog-and-mixed-signal-chips-resist-adaptive-test/
+  track: post_silicon_test
+  topics:
+  - analog_test
+  - adaptive_test
+  - guard_band
+  - characterization
+  - data_quality
+  difficulty: advanced
+  estimated_minutes: 20
+  summary: 'Explains why analog measurements, marginal behavior, contact quality, guard bands, and limited
+    data complicate adaptive-test decisions.
+
+    '
+  why_it_matters: 'It connects measurement integrity, outliers, limits, and test reduction to real production
+    and characterization risks.
+
+    '
+  enabled: true
+- id: shmoo_and_silent_errors
+  order: 160
+  title: Why Silent Data Errors Are So Hard to Find
+  source_name: Semiconductor Engineering
+  url: https://semiengineering.com/why-silent-data-errors-are-so-hard-to-find/
+  track: post_silicon_test
+  topics:
+  - shmoo
+  - voltage
+  - temperature
+  - frequency
+  - silent_error
+  - margining
+  difficulty: advanced
+  estimated_minutes: 20
+  summary: 'Examines silent data errors and describes using voltage, temperature, and frequency sweeps
+    to reproduce marginal failures.
+
+    '
+  why_it_matters: 'Shmooing and multi-dimensional margin searches are core post-silicon techniques for
+    exposing failures that normal functional tests miss.
+
+    '
+  enabled: true

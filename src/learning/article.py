@@ -3,6 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Iterable, Mapping
 
+from src.content.extractor import (
+    ArticleContentExtractor,
+    ContentExtractionError,
+)
 from src.learning.library import LearningLesson
 from src.models import Article
 
@@ -58,6 +62,8 @@ def learning_lesson_to_article(
     )
     tags = _build_source_tags(lesson)
 
+    curated_html, curated_text = _build_curated_content(lesson)
+
     return Article(
         source_id="technical_learning",
         source_name=lesson.source_name,
@@ -74,6 +80,13 @@ def learning_lesson_to_article(
         summary=_build_summary(lesson),
         author=None,
         fetched_at=_to_iso(evaluated_at),
+        content_html=curated_html,
+        content_text=curated_text,
+        content_status=(
+            "extracted"
+            if curated_html or curated_text
+            else "not_requested"
+        ),
     )
 
 
@@ -157,6 +170,49 @@ def learning_lesson_id_from_article(
     return external_lesson_id or tagged_lesson_id
 
 
+def _build_curated_content(
+    lesson: LearningLesson,
+) -> tuple[str, str]:
+    """Sanitize optional lesson content for private EPUB rendering."""
+
+    content_html = lesson.content_html.strip()
+    if not content_html:
+        return "", ""
+
+    extractor = ArticleContentExtractor(
+        minimum_text_chars=1,
+        maximum_text_chars=120_000,
+    )
+
+    try:
+        extracted = extractor.extract(
+            (
+                '<article>'
+                '<div itemprop="articleBody">'
+                f'{content_html}'
+                '</div>'
+                '</article>'
+            ),
+            base_url=lesson.url,
+        )
+    except ContentExtractionError as exc:
+        raise ValueError(
+            "Invalid curated content for learning lesson "
+            f"'{lesson.id}': {exc}"
+        ) from exc
+
+    if not extracted.is_usable:
+        raise ValueError(
+            "Curated content for learning lesson "
+            f"'{lesson.id}' is empty after sanitization"
+        )
+
+    return (
+        extracted.content_html,
+        extracted.content_text,
+    )
+
+
 def _build_source_tags(
     lesson: LearningLesson,
 ) -> tuple[str, ...]:
@@ -166,6 +222,11 @@ def _build_source_tags(
         f"learning_track:{lesson.track}",
         f"difficulty:{lesson.difficulty}",
         f"estimated_minutes:{lesson.estimated_minutes}",
+        *(
+            ("learning_content:curated",)
+            if lesson.content_html.strip()
+            else ()
+        ),
         *lesson.topics,
     )
     return tuple(dict.fromkeys(values))
