@@ -12,6 +12,7 @@ from src.collector import collect_feeds, write_collection_outputs
 from src.config_loader import ProjectConfig, load_project_config
 from src.filters.deduplicate import deduplicate_articles
 from src.filters.time_filter import filter_articles_by_time
+from src.learning.pipeline import prepare_learning_edition
 from src.models import Article, ConfigError, Source
 from src.publishing.site_builder import build_static_site
 from src.ranking.rule_based import rank_articles
@@ -120,6 +121,9 @@ def _process_and_write_ranked_articles(
     articles: tuple[Article, ...],
     output_dir: Path,
     *,
+    config_dir: Path | None = None,
+    archive_root: Path | None = None,
+    enable_learning: bool = False,
     now: datetime | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     runtime = config.settings["runtime"]
@@ -138,12 +142,35 @@ def _process_and_write_ranked_articles(
     )
 
     max_articles = int(runtime["max_articles"])
+    learning_plan = None
+    news_capacity = max_articles
+
+    if enable_learning:
+        resolved_config_dir = config_dir or Path("config")
+        resolved_archive_root = archive_root or (
+            Path(str(runtime.get("site_dir", "site")))
+            / "archive"
+        )
+        learning_plan = prepare_learning_edition(
+            profile=config.profile,
+            config_dir=resolved_config_dir,
+            archive_root=resolved_archive_root,
+            max_articles=max_articles,
+            now=evaluated_at,
+        )
+        news_capacity = learning_plan.news_capacity
+
     selection_result = select_articles_by_category_quota(
         ranking_result.articles,
         config.profile,
-        max_articles=max_articles,
+        max_articles=news_capacity,
     )
-    selected_articles = selection_result.articles
+    news_articles = selection_result.articles
+    selected_articles = (
+        learning_plan.combine(news_articles)
+        if learning_plan is not None
+        else news_articles
+    )
     ranked_articles_path = output_dir / "ranked_articles.json"
 
     processing_summary: dict[str, Any] = {
@@ -156,6 +183,18 @@ def _process_and_write_ranked_articles(
         "selection": selection_result.summary(),
         "selected_articles": len(selected_articles),
     }
+
+    if learning_plan is not None:
+        processing_summary["selected_news_articles"] = len(
+            news_articles
+        )
+        processing_summary["selected_learning_articles"] = (
+            learning_plan.selected_count
+        )
+        processing_summary["learning"] = learning_plan.summary(
+            news_article_count=len(news_articles),
+            final_article_count=len(selected_articles),
+        )
     features = config.settings["features"]
     rendering_summary: dict[str, dict[str, Any]] = {}
 
@@ -226,6 +265,8 @@ def _process_and_write_ranked_articles(
         "article_count": len(selected_articles),
         "articles": [article.to_dict() for article in selected_articles],
     }
+    if learning_plan is not None:
+        payload["learning"] = learning_plan.payload()
     _write_json_atomic(ranked_articles_path, payload)
 
     return ranked_articles_path, processing_summary
@@ -274,6 +315,27 @@ def _print_execution_summary(summary: dict[str, Any]) -> None:
         print(f"Articles within lookback: {time_filter['kept_articles']}")
         print(f"Unique articles:          {deduplication['unique_articles']}")
         print(f"Selected articles:        {processing['selected_articles']}")
+
+        learning = processing.get("learning")
+        if isinstance(learning, dict):
+            print(
+                "Selected news articles:   "
+                f"{processing['selected_news_articles']}"
+            )
+            print(
+                "Selected learning items:  "
+                f"{processing['selected_learning_articles']}"
+            )
+
+            lesson_ids = learning.get(
+                "selected_lesson_ids",
+                [],
+            )
+            if isinstance(lesson_ids, list) and lesson_ids:
+                print(
+                    "Learning lesson IDs:     "
+                    + ", ".join(str(item) for item in lesson_ids)
+                )
 
         selection = processing.get("selection")
         if isinstance(selection, dict):
@@ -330,7 +392,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     result = collect_feeds(config, sources=selected_sources)
-    output_dir = args.output_dir or Path(config.settings["runtime"]["output_dir"])
+    runtime = config.settings["runtime"]
+    output_dir = args.output_dir or Path(runtime["output_dir"])
+    site_dir = Path(str(runtime.get("site_dir", "site")))
     raw_path, report_path = write_collection_outputs(
         result=result,
         output_dir=output_dir,
@@ -346,6 +410,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 config=config,
                 articles=result.articles,
                 output_dir=output_dir,
+                config_dir=args.config_dir,
+                archive_root=site_dir / "archive",
+                enable_learning=not bool(args.source),
             )
         except ValueError as exc:
             print(f"Processing error: {exc}", file=sys.stderr)
@@ -373,9 +440,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 2
 
-        site_dir = Path(
-            str(config.settings["runtime"].get("site_dir", "site"))
-        )
         timezone_name = str(
             config.profile["profile"].get("timezone", "UTC")
         )
