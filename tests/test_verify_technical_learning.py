@@ -17,14 +17,93 @@ def _write_epub(
     path: Path,
     *,
     title: str = "Phase-Locked Loop Fundamentals",
+    legacy_link: bool = False,
+    include_page_breaks: bool = True,
+    full_content_count: int = 2,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    source_label = (
+        "Read the original article"
+        if legacy_link
+        else "Original source"
+    )
+    stylesheet = "article { break-inside: auto; page-break-inside: auto; }"
+    if include_page_breaks:
+        stylesheet += (
+            "\narticle + article { break-before: page; "
+            "page-break-before: always; }"
+        )
+
+    linux_articles: list[str] = []
+    for index in range(11):
+        body_class = (
+            ' class="article-content full-content"'
+            if index < full_content_count
+            else ""
+        )
+        body = (
+            f"<div{body_class}><p>Linux body {index}</p></div>"
+            if body_class
+            else f'<p class="summary">Linux summary {index}</p>'
+        )
+        linux_articles.append(
+            "<article>"
+            f"<h2>Linux article {index}</h2>"
+            f"{body}"
+            f'<p><a href="https://example.com/linux-{index}">'
+            f"{source_label}</a></p>"
+            "</article>"
+        )
+
+    learning_article = (
+        "<article>"
+        f"<h2>{title}</h2>"
+        '<p class="summary">Learning summary</p>'
+        '<p><a href="https://example.com/pll">'
+        f"{source_label}</a></p>"
+        "</article>"
+    )
+
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr("EPUB/styles.css", stylesheet)
+        archive.writestr(
+            "EPUB/category-linux.xhtml",
+            "<html><body>" + "".join(linux_articles) + "</body></html>",
+        )
         archive.writestr(
             "EPUB/category-technical-learning.xhtml",
-            f"<html><body><h1>Technical Learning</h1><h2>{title}</h2></body></html>",
+            "<html><body><h1>Technical Learning</h1>"
+            + learning_article
+            + "</body></html>",
         )
+
+
+def _content_enrichment() -> dict[str, object]:
+    records = []
+    statuses = (
+        ["extracted"] * 2
+        + ["summary_fallback"] * 8
+        + ["fetch_failed"] * 2
+    )
+    for index, status in enumerate(statuses):
+        records.append(
+            {
+                "source_id": f"source-{index}",
+                "title": f"Article {index}",
+                "url": f"https://example.com/{index}",
+                "status": status,
+            }
+        )
+
+    return {
+        "requested_articles": 12,
+        "extracted_articles": 2,
+        "summary_fallback_articles": 8,
+        "failed_articles": 2,
+        "records": records,
+    }
 
 
 def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
@@ -44,6 +123,9 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
             "title": f"Linux article {index}",
             "url": f"https://example.com/linux-{index}",
             "external_id": f"linux:{index}",
+            "content_html": "",
+            "content_text": "",
+            "content_status": "not_requested",
         }
         for index in range(11)
     ]
@@ -55,11 +137,17 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
             "title": "Phase-Locked Loop Fundamentals",
             "url": "https://example.com/pll",
             "external_id": "learning:pll_fundamentals",
+            "content_html": "",
+            "content_text": "",
+            "content_status": "not_requested",
         }
     )
 
     payload = {
         "article_count": 12,
+        "summary": {
+            "content_enrichment": _content_enrichment(),
+        },
         "learning": {
             "enabled": True,
             "lesson_ids": ["pll_fundamentals"],
@@ -104,7 +192,7 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
     return output_dir, site_dir
 
 
-def test_verifies_complete_technical_learning_output(
+def test_verifies_learning_and_full_text_epub_output(
     tmp_path: Path,
 ) -> None:
     output_dir, site_dir = _build_valid_artifacts(tmp_path)
@@ -119,18 +207,148 @@ def test_verifies_complete_technical_learning_output(
     assert result.total_articles == 12
     assert result.learning_articles == 1
     assert result.lesson_ids == ("pll_fundamentals",)
-    assert result.archive_file == (
-        site_dir
-        / "archive"
-        / "2026"
-        / "07"
-        / "31"
-        / "ranked_articles.json"
+    assert result.content_requested == 12
+    assert result.content_extracted == 2
+    assert result.content_fallback == 8
+    assert result.content_failed == 2
+
+
+def test_accepts_legacy_nested_processing_summary(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    enrichment = payload["summary"].pop("content_enrichment")
+    payload["summary"]["processing"] = {
+        "content_enrichment": enrichment,
+    }
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    archive_files = list(
+        (site_dir / "archive").rglob("ranked_articles.json")
     )
-    assert result.checked_epub_copies == (
-        site_dir / "digest.epub",
-        site_dir / "latest" / "digest.epub",
+    assert len(archive_files) == 1
+    archive_files[0].write_text(
+        json.dumps(payload),
+        encoding="utf-8",
     )
+
+    result = verify_technical_learning_output(
+        output_dir=output_dir,
+        site_dir=site_dir,
+        expected_total=12,
+        expected_learning=1,
+    )
+
+    assert result.content_requested == 12
+
+
+def test_rejects_missing_content_enrichment_summary(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    del payload["summary"]["content_enrichment"]
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="enrichment summary is missing",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_content_enrichment_count_mismatch(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    payload["summary"]["content_enrichment"][
+        "failed_articles"
+    ] = 1
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="counts do not add up",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_public_full_content_leak(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+    payload["articles"][0]["content_text"] = "Private full body"
+    ranked_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        VerificationError,
+        match="publicly exposes full article text",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_legacy_read_more_link(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    _write_epub(
+        output_dir / "digest.epub",
+        legacy_link=True,
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match="legacy read-more link",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_missing_article_page_break_rules(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    _write_epub(
+        output_dir / "digest.epub",
+        include_page_breaks=False,
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match=r"does not contain: article \+ article",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
 
 
 def test_rejects_learning_metadata_mismatch(
@@ -145,27 +363,6 @@ def test_rejects_learning_metadata_mismatch(
     with pytest.raises(
         VerificationError,
         match="metadata do not match",
-    ):
-        verify_technical_learning_output(
-            output_dir=output_dir,
-            site_dir=site_dir,
-            expected_total=12,
-            expected_learning=1,
-        )
-
-
-def test_rejects_missing_markdown_section(
-    tmp_path: Path,
-) -> None:
-    output_dir, site_dir = _build_valid_artifacts(tmp_path)
-    (output_dir / "digest.md").write_text(
-        "# Daily Tech Brief\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(
-        VerificationError,
-        match="does not contain: ## Technical Learning",
     ):
         verify_technical_learning_output(
             output_dir=output_dir,
@@ -197,9 +394,7 @@ def test_rejects_mismatched_published_epub_copy(
     tmp_path: Path,
 ) -> None:
     output_dir, site_dir = _build_valid_artifacts(tmp_path)
-    (site_dir / "latest" / "digest.epub").write_bytes(
-        b"different"
-    )
+    (site_dir / "latest" / "digest.epub").write_bytes(b"different")
 
     with pytest.raises(
         VerificationError,
@@ -213,12 +408,11 @@ def test_rejects_mismatched_published_epub_copy(
         )
 
 
-def test_main_returns_one_and_prints_json_on_failure(
+def test_main_prints_full_content_json_summary(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     output_dir, site_dir = _build_valid_artifacts(tmp_path)
-    (output_dir / "digest.md").unlink()
 
     exit_code = main(
         [
@@ -233,6 +427,11 @@ def test_main_returns_one_and_prints_json_on_failure(
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
 
-    assert exit_code == 1
-    assert payload["status"] == "failed"
-    assert "Required file not found" in payload["error"]
+    assert exit_code == 0
+    assert payload["status"] == "passed"
+    assert payload["content_enrichment"] == {
+        "requested": 12,
+        "extracted": 2,
+        "summary_fallback": 8,
+        "fetch_failed": 2,
+    }

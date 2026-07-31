@@ -70,6 +70,39 @@ def test_extracts_article_body_and_removes_page_noise() -> None:
     assert "related-posts" not in result.content_html
 
 
+def test_nested_noise_elements_do_not_crash_after_parent_decompose() -> None:
+    html = f"""
+    <html>
+      <body>
+        <main>
+          <div class="sidebar">
+            <div class="related-posts">Related content</div>
+            <aside>Nested sidebar</aside>
+          </div>
+
+          <article>
+            <div itemprop="articleBody">
+              <h2>Stable extraction</h2>
+              <p>{_long_paragraph("The valid article body")}</p>
+            </div>
+          </article>
+        </main>
+      </body>
+    </html>
+    """
+
+    result = ArticleContentExtractor().extract(
+        html,
+        base_url="https://example.com/articles/stable",
+    )
+
+    assert result.status == "extracted"
+    assert result.selector == "[itemprop='articleBody']"
+    assert "Stable extraction" in result.content_text
+    assert "Related content" not in result.content_text
+    assert "Nested sidebar" not in result.content_text
+
+
 def test_keeps_reading_structure_and_normalizes_links() -> None:
     html = f"""
     <article>

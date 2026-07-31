@@ -18,6 +18,10 @@ class VerificationResult:
     total_articles: int
     learning_articles: int
     lesson_ids: tuple[str, ...]
+    content_requested: int
+    content_extracted: int
+    content_fallback: int
+    content_failed: int
     archive_file: Path
     checked_epub_copies: tuple[Path, ...]
 
@@ -25,7 +29,8 @@ class VerificationResult:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Verify Technical Learning output after a full Daily Tech Brief run."
+            "Verify Technical Learning and full-text EPUB output after "
+            "a complete Daily Tech Brief run."
         )
     )
     parser.add_argument(
@@ -107,6 +112,15 @@ def verify_technical_learning_output(
             f"found {article_count}"
         )
 
+    _verify_public_articles_are_summary_only(
+        articles,
+        source=ranked_path,
+    )
+    enrichment = _extract_content_enrichment(
+        payload,
+        expected_total=expected_total,
+    )
+
     learning_articles = [
         article
         for article in articles
@@ -185,6 +199,8 @@ def verify_technical_learning_output(
         epub_path,
         learning_titles=learning_titles,
         require_learning=bool(expected_learning),
+        expected_articles=expected_total,
+        expected_full_content=enrichment["extracted_articles"],
     )
 
     site_index = site_dir / "index.html"
@@ -217,9 +233,141 @@ def verify_technical_learning_output(
         total_articles=article_count,
         learning_articles=len(learning_articles),
         lesson_ids=tuple(lesson_ids),
+        content_requested=enrichment["requested_articles"],
+        content_extracted=enrichment["extracted_articles"],
+        content_fallback=enrichment["summary_fallback_articles"],
+        content_failed=enrichment["failed_articles"],
         archive_file=archive_file,
         checked_epub_copies=checked_epub_copies,
     )
+
+
+def _extract_content_enrichment(
+    payload: dict[str, Any],
+    *,
+    expected_total: int,
+) -> dict[str, int]:
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        raise VerificationError(
+            "ranked_articles.json summary must be an object"
+        )
+
+    nested_processing = summary.get("processing")
+    if nested_processing is None:
+        processing = summary
+    elif isinstance(nested_processing, dict):
+        processing = nested_processing
+    else:
+        raise VerificationError(
+            "ranked_articles.json summary.processing must be an object"
+        )
+
+    enrichment = processing.get("content_enrichment")
+    if not isinstance(enrichment, dict):
+        raise VerificationError(
+            "Full-content EPUB enrichment summary is missing"
+        )
+
+    fields = (
+        "requested_articles",
+        "extracted_articles",
+        "summary_fallback_articles",
+        "failed_articles",
+    )
+    counts = {
+        field: _require_non_negative_integer(
+            enrichment.get(field),
+            field=f"content_enrichment.{field}",
+        )
+        for field in fields
+    }
+
+    if counts["requested_articles"] != expected_total:
+        raise VerificationError(
+            "Full-content enrichment did not request every "
+            "selected article"
+        )
+
+    completed = (
+        counts["extracted_articles"]
+        + counts["summary_fallback_articles"]
+        + counts["failed_articles"]
+    )
+    if completed != counts["requested_articles"]:
+        raise VerificationError(
+            "Full-content enrichment counts do not add up"
+        )
+
+    records = enrichment.get("records")
+    if not isinstance(records, list):
+        raise VerificationError(
+            "content_enrichment.records must be a list"
+        )
+    if len(records) != counts["requested_articles"]:
+        raise VerificationError(
+            "content_enrichment.records does not match "
+            "requested_articles"
+        )
+
+    status_counts = {
+        "extracted": 0,
+        "summary_fallback": 0,
+        "fetch_failed": 0,
+    }
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            raise VerificationError(
+                f"content_enrichment.records[{index}] must be an object"
+            )
+        status = record.get("status")
+        if status not in status_counts:
+            raise VerificationError(
+                f"content_enrichment.records[{index}].status "
+                "is invalid"
+            )
+        status_counts[status] += 1
+
+    expected_status_counts = {
+        "extracted": counts["extracted_articles"],
+        "summary_fallback": counts["summary_fallback_articles"],
+        "fetch_failed": counts["failed_articles"],
+    }
+    if status_counts != expected_status_counts:
+        raise VerificationError(
+            "Full-content enrichment record statuses do not "
+            "match the summary counts"
+        )
+
+    return counts
+
+
+def _verify_public_articles_are_summary_only(
+    articles: list[Any],
+    *,
+    source: Path,
+) -> None:
+    for index, article in enumerate(articles):
+        if not isinstance(article, dict):
+            raise VerificationError(
+                f"{source} articles[{index}] must be an object"
+            )
+
+        if str(article.get("content_html") or "").strip():
+            raise VerificationError(
+                f"{source} publicly exposes full article HTML"
+            )
+        if str(article.get("content_text") or "").strip():
+            raise VerificationError(
+                f"{source} publicly exposes full article text"
+            )
+
+        status = article.get("content_status", "not_requested")
+        if status != "not_requested":
+            raise VerificationError(
+                f"{source} public article content_status must be "
+                "'not_requested'"
+            )
 
 
 def _extract_learning_article_ids(
@@ -292,6 +440,8 @@ def _verify_epub(
     *,
     learning_titles: tuple[str, ...],
     require_learning: bool,
+    expected_articles: int,
+    expected_full_content: int,
 ) -> None:
     _require_file(path)
 
@@ -306,23 +456,78 @@ def _verify_epub(
 
             names = set(archive.namelist())
             chapter = "EPUB/category-technical-learning.xhtml"
+            stylesheet_name = "EPUB/styles.css"
 
             if require_learning and chapter not in names:
                 raise VerificationError(
                     f"{path} is missing {chapter}"
                 )
+            if stylesheet_name not in names:
+                raise VerificationError(
+                    f"{path} is missing {stylesheet_name}"
+                )
+
+            category_names = sorted(
+                name
+                for name in names
+                if name.startswith("EPUB/category-")
+                and name.endswith(".xhtml")
+            )
+            chapters = [
+                archive.read(name).decode("utf-8")
+                for name in category_names
+            ]
+            combined = "\n".join(chapters)
 
             if require_learning:
-                chapter_text = archive.read(
+                learning_chapter = archive.read(
                     chapter
                 ).decode("utf-8")
-
                 for title in learning_titles:
                     _require_contains(
-                        chapter_text,
+                        learning_chapter,
                         title,
                         source=path,
                     )
+
+            if "Read the original article" in combined:
+                raise VerificationError(
+                    f"{path} still contains the legacy read-more link"
+                )
+
+            original_source_count = combined.count(
+                ">Original source</a>"
+            )
+            if original_source_count != expected_articles:
+                raise VerificationError(
+                    f"{path} contains {original_source_count} Original "
+                    f"source links; expected {expected_articles}"
+                )
+
+            full_content_count = combined.count(
+                'class="article-content full-content'
+            )
+            if full_content_count != expected_full_content:
+                raise VerificationError(
+                    f"{path} contains {full_content_count} full-content "
+                    f"articles; expected {expected_full_content}"
+                )
+
+            stylesheet = archive.read(
+                stylesheet_name
+            ).decode("utf-8")
+            for required_rule in (
+                "article + article",
+                "break-before: page;",
+                "page-break-before: always;",
+                "break-inside: auto;",
+                "page-break-inside: auto;",
+            ):
+                _require_contains(
+                    stylesheet,
+                    required_rule,
+                    source=path,
+                )
     except zipfile.BadZipFile as exc:
         raise VerificationError(
             f"{path} is not a valid EPUB ZIP archive"
@@ -445,11 +650,11 @@ def _require_non_empty_string(
     return value.strip()
 
 
-def _validate_expected_count(
-    value: int,
+def _require_non_negative_integer(
+    value: Any,
     *,
     field: str,
-) -> None:
+) -> int:
     if (
         not isinstance(value, int)
         or isinstance(value, bool)
@@ -458,6 +663,18 @@ def _validate_expected_count(
         raise VerificationError(
             f"{field} must be a non-negative integer"
         )
+    return value
+
+
+def _validate_expected_count(
+    value: int,
+    *,
+    field: str,
+) -> None:
+    _require_non_negative_integer(
+        value,
+        field=field,
+    )
 
 
 def _result_payload(
@@ -468,6 +685,12 @@ def _result_payload(
         "total_articles": result.total_articles,
         "learning_articles": result.learning_articles,
         "lesson_ids": list(result.lesson_ids),
+        "content_enrichment": {
+            "requested": result.content_requested,
+            "extracted": result.content_extracted,
+            "summary_fallback": result.content_fallback,
+            "fetch_failed": result.content_failed,
+        },
         "archive_file": str(result.archive_file),
         "checked_epub_copies": [
             str(path)
@@ -514,17 +737,20 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     else:
-        print("Technical Learning verification passed")
         print(
-            f"- Total articles:    "
+            "Technical Learning and full-text EPUB "
+            "verification passed"
+        )
+        print(
+            f"- Total articles:      "
             f"{result.total_articles}"
         )
         print(
-            f"- Learning articles: "
+            f"- Learning articles:   "
             f"{result.learning_articles}"
         )
         print(
-            "- Lesson IDs:        "
+            "- Lesson IDs:          "
             + (
                 ", ".join(result.lesson_ids)
                 if result.lesson_ids
@@ -532,11 +758,24 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         print(
-            f"- Archive payload:   "
+            f"- Content extracted:   "
+            f"{result.content_extracted}/"
+            f"{result.content_requested}"
+        )
+        print(
+            f"- Summary fallbacks:   "
+            f"{result.content_fallback}"
+        )
+        print(
+            f"- Content fetch fails: "
+            f"{result.content_failed}"
+        )
+        print(
+            f"- Archive payload:     "
             f"{result.archive_file}"
         )
         for path in result.checked_epub_copies:
-            print(f"- EPUB copy matched: {path}")
+            print(f"- EPUB copy matched:   {path}")
 
     return 0
 

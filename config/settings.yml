@@ -9,6 +9,8 @@ runtime:
   site_dir: site
   lookback_hours: 48
   request_timeout_seconds: 20
+  content_timeout_seconds: 15
+  content_max_download_bytes: 5000000
   max_articles: 12
   max_summary_chars: 2000
   user_agent: DailyTechBrief/0.7.0
@@ -20,5 +22,6 @@ features:
   render_markdown: true
   render_html: true
   render_epub: true
+  full_content_epub: true
   build_site: true
   ai_editor: false

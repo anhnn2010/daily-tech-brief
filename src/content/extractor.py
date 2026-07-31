@@ -284,17 +284,34 @@ def _remove_global_noise(
     root: BeautifulSoup | Tag,
 ) -> None:
     for tag_name in _DROP_TAGS:
-        for tag in root.find_all(tag_name):
-            tag.decompose()
+        for tag in list(root.find_all(tag_name)):
+            if _is_live_tag(tag):
+                tag.decompose()
 
     for tag in list(root.find_all(True)):
+        if not _is_live_tag(tag):
+            continue
         if _is_suspicious(tag):
             tag.decompose()
+
+
+def _is_live_tag(
+    tag: Tag,
+) -> bool:
+    """Return whether BeautifulSoup has not decomposed the tag."""
+
+    return (
+        tag.name is not None
+        and tag.attrs is not None
+    )
 
 
 def _is_suspicious(
     tag: Tag,
 ) -> bool:
+    if not _is_live_tag(tag):
+        return False
+
     values: list[str] = []
 
     tag_id = tag.get("id")
@@ -442,10 +459,14 @@ def _sanitize_fragment(
     *,
     base_url: str,
 ) -> None:
-    for h1 in root.find_all("h1"):
-        h1.decompose()
+    for h1 in list(root.find_all("h1")):
+        if _is_live_tag(h1):
+            h1.decompose()
 
     for tag in list(root.find_all(True)):
+        if not _is_live_tag(tag):
+            continue
+
         if tag.name in _DROP_TAGS:
             tag.decompose()
             continue
@@ -538,6 +559,9 @@ def _remove_empty_elements(
         changed = False
 
         for tag in list(root.find_all(removable)):
+            if not _is_live_tag(tag):
+                continue
+
             text = _clean_inline_text(
                 tag.get_text(
                     " ",
