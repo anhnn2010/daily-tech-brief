@@ -118,6 +118,42 @@ def _select_sources(config: ProjectConfig, source_ids: list[str]) -> tuple[Sourc
     return tuple(enabled_by_id[source_id] for source_id in dict.fromkeys(source_ids))
 
 
+def _strip_article_content(
+    article: Article,
+) -> Article:
+    """Return a public-safe article without full body content."""
+
+    if (
+        not article.content_html
+        and not article.content_text
+        and article.content_status == "not_requested"
+    ):
+        return article
+
+    return replace(
+        article,
+        content_html="",
+        content_text="",
+        content_status="not_requested",
+    )
+
+
+def _public_ranked_articles(
+    ranked_articles: tuple[RankedArticle, ...],
+) -> tuple[RankedArticle, ...]:
+    """Remove private EPUB content from public render and JSON payloads."""
+
+    return tuple(
+        replace(
+            ranked_article,
+            article=_strip_article_content(
+                ranked_article.article
+            ),
+        )
+        for ranked_article in ranked_articles
+    )
+
+
 def _enrich_ranked_articles_for_epub(
     ranked_articles: tuple[RankedArticle, ...],
     runtime: dict[str, Any],
@@ -242,6 +278,9 @@ def _process_and_write_ranked_articles(
         )
     features = config.settings["features"]
     rendering_summary: dict[str, dict[str, Any]] = {}
+    public_articles = _public_ranked_articles(
+        selected_articles
+    )
     epub_articles = selected_articles
 
     if (
@@ -262,7 +301,7 @@ def _process_and_write_ranked_articles(
     if features.get("render_markdown", False):
         markdown_path = output_dir / "digest.md"
         markdown_content = render_markdown_digest(
-            selected_articles,
+            public_articles,
             config.profile,
             generated_at=ranking_result.evaluated_at,
             project_name=str(config.settings["project"]["name"]),
@@ -279,7 +318,7 @@ def _process_and_write_ranked_articles(
     if features.get("render_html", False):
         html_path = output_dir / "digest.html"
         html_content = render_html_digest(
-            selected_articles,
+            public_articles,
             config.profile,
             generated_at=ranking_result.evaluated_at,
             project_name=str(config.settings["project"]["name"]),
@@ -324,7 +363,10 @@ def _process_and_write_ranked_articles(
         "generated_at": ranking_result.evaluated_at,
         "summary": processing_summary,
         "article_count": len(selected_articles),
-        "articles": [article.to_dict() for article in selected_articles],
+        "articles": [
+            article.to_dict()
+            for article in public_articles
+        ],
     }
     if learning_plan is not None:
         payload["learning"] = learning_plan.payload()
