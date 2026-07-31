@@ -202,7 +202,7 @@ def test_enriches_article_and_uses_browser_headers() -> None:
     assert response.closed is True
 
 
-def test_timeout_and_http_error_are_isolated() -> None:
+def test_timeout_and_http_error_use_available_summary() -> None:
     session = FakeSession(
         [
             requests.ReadTimeout("slow site"),
@@ -219,15 +219,30 @@ def test_timeout_and_http_error_are_isolated() -> None:
     )
 
     assert [article.content_status for article in result.articles] == [
-        "fetch_failed",
-        "fetch_failed",
+        "summary_fallback",
+        "summary_fallback",
     ]
     assert [record.status for record in result.records] == [
-        "fetch_failed",
-        "fetch_failed",
+        "summary_fallback",
+        "summary_fallback",
     ]
     assert "slow site" in (result.records[0].error or "")
     assert "403 Client Error" in (result.records[1].error or "")
+    assert extractor.calls == []
+
+
+def test_request_error_without_summary_remains_fetch_failed() -> None:
+    session = FakeSession(
+        [requests.ConnectTimeout("offline")]
+    )
+    extractor = StubExtractor(_usable_extracted())
+    article = replace(_article(), summary="")
+
+    result = _enricher(session, extractor).enrich([article])
+
+    assert result.articles[0].content_status == "fetch_failed"
+    assert result.records[0].status == "fetch_failed"
+    assert "offline" in (result.records[0].error or "")
     assert extractor.calls == []
 
 
@@ -394,18 +409,18 @@ def test_preserves_input_order_and_summarizes_statuses() -> None:
     ]
     assert result.requested_count == 3
     assert result.extracted_count == 1
-    assert result.fallback_count == 1
-    assert result.failed_count == 1
+    assert result.fallback_count == 2
+    assert result.failed_count == 0
 
     summary = result.summary()
     assert summary["requested_articles"] == 3
     assert summary["extracted_articles"] == 1
-    assert summary["summary_fallback_articles"] == 1
-    assert summary["failed_articles"] == 1
+    assert summary["summary_fallback_articles"] == 2
+    assert summary["failed_articles"] == 0
     assert len(summary["records"]) == 3
 
 
-def test_streaming_request_error_is_isolated() -> None:
+def test_streaming_request_error_uses_available_summary() -> None:
     response = FakeResponse(
         headers={"Content-Type": "text/html"},
         stream_error=requests.exceptions.ChunkedEncodingError(
@@ -417,8 +432,8 @@ def test_streaming_request_error_is_isolated() -> None:
 
     result = _enricher(session, extractor).enrich([_article()])
 
-    assert result.articles[0].content_status == "fetch_failed"
-    assert result.records[0].status == "fetch_failed"
+    assert result.articles[0].content_status == "summary_fallback"
+    assert result.records[0].status == "summary_fallback"
     assert "connection interrupted" in (
         result.records[0].error or ""
     )

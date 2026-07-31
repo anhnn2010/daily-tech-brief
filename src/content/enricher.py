@@ -373,6 +373,15 @@ class ArticleContentEnricher:
         http_status: int | None = None,
         content_type: str | None = None,
     ) -> tuple[Article, ContentEnrichmentRecord]:
+        if _has_readable_summary(article):
+            return self._fallback(
+                article,
+                started=started,
+                error=error,
+                http_status=http_status,
+                content_type=content_type,
+            )
+
         failed_article = replace(
             article,
             content_html="",
@@ -464,6 +473,16 @@ def _read_limited_body(
         )
 
     return b"".join(chunks)
+
+
+
+def _has_readable_summary(
+    article: Article,
+) -> bool:
+    return bool(
+        isinstance(article.summary, str)
+        and article.summary.strip()
+    )
 
 
 def _normalize_content_type(
