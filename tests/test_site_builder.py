@@ -20,6 +20,7 @@ def write_generated_output(
     include_optional_files: bool = True,
     include_epub: bool = True,
     epub_content: bytes = EPUB_BYTES,
+    full_epub_content: bytes = b"PK\x03\x04full epub payload",
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -55,6 +56,9 @@ def write_generated_output(
 
     if include_epub:
         (output_dir / "digest.epub").write_bytes(epub_content)
+        (output_dir / "digest-full.epub").write_bytes(
+            full_epub_content
+        )
 
 
 def read_json(path: Path) -> dict:
@@ -98,6 +102,33 @@ def test_build_static_site_creates_latest_and_local_date_archive(
     for epub_path in epub_destinations:
         assert epub_path.read_bytes() == EPUB_BYTES
         assert epub_path in result.copied_files
+    full_epub_destinations = (
+        site_dir / "digest-full.epub",
+        site_dir / "latest" / "digest-full.epub",
+        archive_dir / "digest-full.epub",
+    )
+    for epub_path in full_epub_destinations:
+        assert epub_path.read_bytes() == b"PK\x03\x04full epub payload"
+        assert epub_path in result.copied_files
+
+    opds_catalog = site_dir / "opds" / "catalog.xml"
+    opds_book = (
+        site_dir
+        / "opds"
+        / "books"
+        / "daily-tech-brief-2026-07-30.epub"
+    )
+    assert result.opds_catalog_path == opds_catalog
+    assert result.opds_edition_count == 1
+    assert result.opds_skipped_dates == ()
+    assert opds_catalog.is_file()
+    assert opds_book.read_bytes() == b"PK\x03\x04full epub payload"
+    assert opds_catalog in result.copied_files
+    assert opds_book in result.copied_files
+
+    catalog_xml = opds_catalog.read_text(encoding="utf-8")
+    assert "http://opds-spec.org/acquisition" in catalog_xml
+    assert "books/daily-tech-brief-2026-07-30.epub" in catalog_xml
 
     assert (site_dir / "ranked_articles.json").is_file()
     assert (site_dir / "source_report.json").is_file()
@@ -147,6 +178,9 @@ def test_build_static_site_writes_archive_manifest_and_metadata(
     assert metadata["latest_path"] == "latest/"
     assert metadata["archive_path"] == "archive/"
     assert metadata["article_count"] == 3
+    assert metadata["opds_path"] == "opds/catalog.xml"
+    assert metadata["opds_edition_count"] == 1
+    assert metadata["opds_skipped_dates"] == []
     assert "2026/07/30/" in archive_html
     assert "3 articles" in archive_html
 
@@ -209,6 +243,12 @@ def test_build_static_site_preserves_existing_archive_entries(
         "2026-07-29",
     ]
 
+    catalog_xml = (
+        site_dir / "opds" / "catalog.xml"
+    ).read_text(encoding="utf-8")
+    assert "daily-tech-brief-2026-07-30.epub" in catalog_xml
+    assert "daily-tech-brief-2026-07-29.epub" not in catalog_xml
+
 
 def test_build_static_site_replaces_same_day_archive_without_duplicate(
     tmp_path: Path,
@@ -240,6 +280,7 @@ def test_build_static_site_replaces_same_day_archive_without_duplicate(
         generated_at="2026-07-30T05:00:00Z",
         article_count=7,
         epub_content=UPDATED_EPUB_BYTES,
+        full_epub_content=b"PK\x03\x04updated full epub",
     )
     (output_dir / "digest.html").write_text(
         "<!doctype html><html><body>Updated digest</body></html>",
@@ -273,6 +314,12 @@ def test_build_static_site_replaces_same_day_archive_without_duplicate(
         manifest["editions"][0]["generated_at"]
         == "2026-07-30T05:00:00Z"
     )
+    assert (
+        site_dir
+        / "opds"
+        / "books"
+        / "daily-tech-brief-2026-07-30.epub"
+    ).read_bytes() == b"PK\x03\x04updated full epub"
 
 
 def test_build_static_site_allows_missing_optional_files(
@@ -297,6 +344,9 @@ def test_build_static_site_allows_missing_optional_files(
     assert not (site_dir / "digest.epub").exists()
     assert not (site_dir / "source_report.json").exists()
     assert (site_dir / "ranked_articles.json").is_file()
+    assert result.opds_catalog_path is None
+    assert result.opds_edition_count == 0
+    assert not (site_dir / "opds").exists()
 
 
 def test_build_static_site_allows_epub_to_be_disabled(
@@ -320,6 +370,31 @@ def test_build_static_site_allows_epub_to_be_disabled(
     assert not (site_dir / "digest.epub").exists()
     assert not (site_dir / "latest" / "digest.epub").exists()
     assert not (archive_dir / "digest.epub").exists()
+
+
+def test_build_static_site_removes_stale_opds_when_no_full_epub_exists(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "output"
+    site_dir = tmp_path / "site"
+    stale_catalog = site_dir / "opds" / "catalog.xml"
+    stale_catalog.parent.mkdir(parents=True)
+    stale_catalog.write_text("stale", encoding="utf-8")
+
+    write_generated_output(
+        output_dir,
+        include_epub=False,
+    )
+
+    result = build_static_site(
+        output_dir,
+        site_dir,
+        timezone_name="Asia/Ho_Chi_Minh",
+    )
+
+    assert result.opds_catalog_path is None
+    assert result.opds_edition_count == 0
+    assert not (site_dir / "opds").exists()
 
 
 @pytest.mark.parametrize(

@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .opds_builder import OpdsBuildResult, build_opds_catalog
+
 
 @dataclass(frozen=True)
 class SiteBuildResult:
@@ -20,6 +22,9 @@ class SiteBuildResult:
     archive_dir: Path
     archive_index_path: Path
     archive_manifest_path: Path
+    opds_catalog_path: Path | None
+    opds_edition_count: int
+    opds_skipped_dates: tuple[str, ...]
     archive_date: str
     generated_at: str
     article_count: int
@@ -33,6 +38,13 @@ class SiteBuildResult:
             "archive_dir": str(self.archive_dir),
             "archive_index_path": str(self.archive_index_path),
             "archive_manifest_path": str(self.archive_manifest_path),
+            "opds_catalog_path": (
+                str(self.opds_catalog_path)
+                if self.opds_catalog_path is not None
+                else None
+            ),
+            "opds_edition_count": self.opds_edition_count,
+            "opds_skipped_dates": list(self.opds_skipped_dates),
             "archive_date": self.archive_date,
             "generated_at": self.generated_at,
             "article_count": self.article_count,
@@ -96,6 +108,7 @@ def build_static_site(
     public_files = {
         "digest_markdown": "digest.md",
         "digest_epub": "digest.epub",
+        "digest_full_epub": "digest-full.epub",
         "ranked_articles": "ranked_articles.json",
         "source_report": "source_report.json",
     }
@@ -146,13 +159,25 @@ def build_static_site(
     copied_files.append(archive_manifest_path)
 
     archive_listing_path = archive_root / "index.html"
+    project_name = _load_project_name(ranked_payload)
     archive_listing = _render_archive_index(
-        project_name=_load_project_name(ranked_payload),
+        project_name=project_name,
         timezone_name=timezone_name.strip(),
         entries=archive_entries,
     )
     _write_text_atomic(archive_listing_path, archive_listing)
     copied_files.append(archive_listing_path)
+
+    opds_result = _build_optional_opds_catalog(
+        site_dir,
+        catalog_title=project_name,
+    )
+    if opds_result is not None:
+        copied_files.append(opds_result.catalog_path)
+        copied_files.extend(
+            edition.published_epub
+            for edition in opds_result.editions
+        )
 
     metadata_path = site_dir / "site.json"
     metadata = {
@@ -165,6 +190,21 @@ def build_static_site(
         "latest_path": "latest/",
         "archive_path": "archive/",
         "archive_date": archive_date,
+        "opds_path": (
+            "opds/catalog.xml"
+            if opds_result is not None
+            else None
+        ),
+        "opds_edition_count": (
+            len(opds_result.editions)
+            if opds_result is not None
+            else 0
+        ),
+        "opds_skipped_dates": (
+            list(opds_result.skipped_dates)
+            if opds_result is not None
+            else []
+        ),
     }
     _write_json_atomic(metadata_path, metadata)
     copied_files.append(metadata_path)
@@ -180,11 +220,46 @@ def build_static_site(
         archive_dir=archive_dir,
         archive_index_path=archive_listing_path,
         archive_manifest_path=archive_manifest_path,
+        opds_catalog_path=(
+            opds_result.catalog_path
+            if opds_result is not None
+            else None
+        ),
+        opds_edition_count=(
+            len(opds_result.editions)
+            if opds_result is not None
+            else 0
+        ),
+        opds_skipped_dates=(
+            opds_result.skipped_dates
+            if opds_result is not None
+            else ()
+        ),
         archive_date=archive_date,
         generated_at=generated_at,
         article_count=article_count,
         copied_files=tuple(copied_files),
     )
+
+
+def _build_optional_opds_catalog(
+    site_dir: Path,
+    *,
+    catalog_title: str,
+) -> OpdsBuildResult | None:
+    """Build OPDS when at least one archived full EPUB is available."""
+
+    try:
+        return build_opds_catalog(
+            site_dir,
+            catalog_title=catalog_title,
+        )
+    except FileNotFoundError:
+        opds_dir = site_dir / "opds"
+        if opds_dir.exists():
+            shutil.rmtree(opds_dir)
+        return None
+
 
 
 def _load_source_files(output_dir: Path) -> dict[str, Path | None]:
@@ -195,6 +270,7 @@ def _load_source_files(output_dir: Path) -> dict[str, Path | None]:
     optional = {
         "digest_markdown": output_dir / "digest.md",
         "digest_epub": output_dir / "digest.epub",
+        "digest_full_epub": output_dir / "digest-full.epub",
         "source_report": output_dir / "source_report.json",
     }
 
