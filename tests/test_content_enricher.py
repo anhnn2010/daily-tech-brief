@@ -8,6 +8,8 @@ import requests
 
 from src.content.enricher import (
     ArticleContentEnricher,
+    ContentEnrichmentRecord,
+    ContentEnrichmentResult,
     enrich_selected_articles,
 )
 from src.content.extractor import (
@@ -447,6 +449,14 @@ def test_preserves_input_order_and_summarizes_statuses() -> None:
     assert summary["extracted_articles"] == 1
     assert summary["summary_fallback_articles"] == 2
     assert summary["failed_articles"] == 0
+    assert summary["content_origins"] == {
+        "feed": 0,
+        "web": 1,
+        "curated": 0,
+        "summary": 2,
+        "none": 0,
+        "unknown": 0,
+    }
     assert len(summary["records"]) == 3
 
 
@@ -545,3 +555,33 @@ def test_preloaded_content_reports_feed_and_curated_origins() -> None:
     ]
     assert session.calls == []
     assert extractor.calls == []
+
+
+def test_unknown_content_origin_is_counted_safely() -> None:
+    article = _article(title="Unknown origin")
+    record = ContentEnrichmentRecord(
+        source_id=article.source_id,
+        title=article.title,
+        url=article.url,
+        status="extracted",
+        http_status=None,
+        content_type=None,
+        selector=None,
+        word_count=10,
+        duration_seconds=0.0,
+        error=None,
+        content_origin="custom-provider",
+    )
+    result = ContentEnrichmentResult(
+        articles=(article,),
+        records=(record,),
+    )
+
+    assert result.content_origin_counts == {
+        "feed": 0,
+        "web": 0,
+        "curated": 0,
+        "summary": 0,
+        "none": 0,
+        "unknown": 1,
+    }

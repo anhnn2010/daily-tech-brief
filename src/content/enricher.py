@@ -93,12 +93,34 @@ class ContentEnrichmentResult:
             for record in self.records
         )
 
+    @property
+    def content_origin_counts(self) -> dict[str, int]:
+        """Count article content by its effective EPUB origin."""
+
+        counts = {
+            _CONTENT_ORIGIN_FEED: 0,
+            _CONTENT_ORIGIN_WEB: 0,
+            _CONTENT_ORIGIN_CURATED: 0,
+            _CONTENT_ORIGIN_SUMMARY: 0,
+            _CONTENT_ORIGIN_NONE: 0,
+            _CONTENT_ORIGIN_UNKNOWN: 0,
+        }
+
+        for record in self.records:
+            origin = record.content_origin
+            if origin not in counts:
+                origin = _CONTENT_ORIGIN_UNKNOWN
+            counts[origin] += 1
+
+        return counts
+
     def summary(self) -> dict[str, Any]:
         return {
             "requested_articles": self.requested_count,
             "extracted_articles": self.extracted_count,
             "summary_fallback_articles": self.fallback_count,
             "failed_articles": self.failed_count,
+            "content_origins": self.content_origin_counts,
             "records": [
                 record.to_dict()
                 for record in self.records

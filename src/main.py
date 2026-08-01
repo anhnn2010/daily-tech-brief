@@ -166,6 +166,14 @@ def _enrich_ranked_articles_for_epub(
             "extracted_articles": 0,
             "summary_fallback_articles": 0,
             "failed_articles": 0,
+            "content_origins": {
+                "feed": 0,
+                "web": 0,
+                "curated": 0,
+                "summary": 0,
+                "none": 0,
+                "unknown": 0,
+            },
             "records": [],
         }
 
@@ -455,6 +463,35 @@ def _print_execution_summary(summary: dict[str, Any]) -> None:
                 "Content fetch failures:  "
                 f"{enrichment['failed_articles']}"
             )
+
+            content_origins = enrichment.get(
+                "content_origins"
+            )
+            if isinstance(content_origins, dict):
+                origin_order = (
+                    "feed",
+                    "web",
+                    "curated",
+                    "summary",
+                    "none",
+                )
+                origin_parts = [
+                    f"{origin}={int(content_origins.get(origin, 0))}"
+                    for origin in origin_order
+                ]
+
+                unknown_count = int(
+                    content_origins.get("unknown", 0)
+                )
+                if unknown_count > 0:
+                    origin_parts.append(
+                        f"unknown={unknown_count}"
+                    )
+
+                print(
+                    "Content origins:         "
+                    + ", ".join(origin_parts)
+                )
 
         selection = processing.get("selection")
         if isinstance(selection, dict):
