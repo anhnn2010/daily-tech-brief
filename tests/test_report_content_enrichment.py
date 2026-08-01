@@ -142,3 +142,70 @@ def test_legacy_records_infer_origin(tmp_path: Path) -> None:
         record.content_origin
         for record in report.records
     ] == ["web", "summary"]
+
+
+
+def test_renders_markdown_job_summary(tmp_path: Path) -> None:
+    module = _load_module()
+    report_path = tmp_path / "ranked_articles.json"
+    _write_report(
+        report_path,
+        [
+            _record(
+                title="Feed | Article",
+                status="extracted",
+                content_origin="feed",
+                http_status=None,
+            ),
+            _record(
+                title="Blocked page",
+                status="summary_fallback",
+                content_origin="summary",
+                http_status=403,
+            ),
+        ],
+    )
+
+    report = module.load_content_report(report_path)
+    rendered = module.render_markdown_report(report)
+
+    assert "## Full-content EPUB" in rendered
+    assert "| Full content extracted | 1 |" in rendered
+    assert "| RSS or Atom feed | 1 |" in rendered
+    assert "[Feed \\| Article](" in rendered
+    assert "| Fallback | summary |" in rendered
+    assert "| 403 | fallback |" in rendered
+
+
+def test_markdown_problems_only_hides_extracted_articles(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    report_path = tmp_path / "ranked_articles.json"
+    _write_report(
+        report_path,
+        [
+            _record(
+                title="Extracted article",
+                status="extracted",
+                content_origin="web",
+                http_status=200,
+            ),
+            _record(
+                title="Fallback article",
+                status="summary_fallback",
+                content_origin="summary",
+                http_status=403,
+            ),
+        ],
+    )
+
+    report = module.load_content_report(report_path)
+    rendered = module.render_markdown_report(
+        report,
+        problems_only=True,
+    )
+
+    assert "### Articles using fallback" in rendered
+    assert "Extracted article" not in rendered
+    assert "Fallback article" in rendered

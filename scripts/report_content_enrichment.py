@@ -128,10 +128,19 @@ def build_parser() -> argparse.ArgumentParser:
             "Show only summary fallbacks and fetch failures."
         ),
     )
-    parser.add_argument(
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument(
         "--json",
         action="store_true",
         help="Print the report as JSON.",
+    )
+    output_group.add_argument(
+        "--markdown",
+        action="store_true",
+        help=(
+            "Print a Markdown report suitable for "
+            "GitHub Actions Job Summary."
+        ),
     )
     return parser
 
@@ -285,6 +294,139 @@ def render_text_report(
         )
 
     return "\n".join(lines).rstrip()
+
+
+def render_markdown_report(
+    report: ContentReport,
+    *,
+    problems_only: bool = False,
+) -> str:
+    """Render a compact report for GitHub Actions Job Summary."""
+
+    origins = report.origin_counts
+    records = tuple(
+        record
+        for record in report.records
+        if not problems_only or record.is_problem
+    )
+
+    lines = [
+        "## Full-content EPUB",
+        "",
+        "| Metric | Value |",
+        "|---|---:|",
+        f"| Requested articles | {report.requested} |",
+        f"| Full content extracted | {report.extracted} |",
+        f"| Summary fallbacks | {report.summary_fallback} |",
+        f"| Fetch failures | {report.fetch_failed} |",
+        (
+            "| Extraction rate | "
+            f"{report.extraction_rate * 100:.1f}% |"
+        ),
+        "",
+        "### Content origin",
+        "",
+        "| Origin | Articles |",
+        "|---|---:|",
+        f"| RSS or Atom feed | {origins['feed']} |",
+        f"| Web page extraction | {origins['web']} |",
+        f"| Curated learning | {origins['curated']} |",
+        f"| Summary only | {origins['summary']} |",
+        f"| No readable text | {origins['none']} |",
+    ]
+
+    if origins["unknown"]:
+        lines.append(
+            f"| Unknown | {origins['unknown']} |"
+        )
+
+    section_title = (
+        "### Articles using fallback"
+        if problems_only
+        else "### Article details"
+    )
+    lines.extend(
+        [
+            "",
+            section_title,
+            "",
+        ]
+    )
+
+    if not records:
+        lines.append(
+            "No articles require fallback."
+            if problems_only
+            else "No article records."
+        )
+        return "\n".join(lines)
+
+    lines.extend(
+        [
+            (
+                "| # | Status | Origin | Source | Article | "
+                "Words | HTTP | Detail |"
+            ),
+            "|---:|---|---|---|---|---:|---:|---|",
+        ]
+    )
+
+    for record in records:
+        status = {
+            "extracted": "Extracted",
+            "summary_fallback": "Fallback",
+            "fetch_failed": "Failed",
+        }[record.status]
+        http_status = (
+            str(record.http_status)
+            if record.http_status is not None
+            else "—"
+        )
+        detail = record.error or record.selector or "—"
+        title = _markdown_link(
+            record.title,
+            record.url,
+        )
+        lines.append(
+            "| "
+            f"{record.index} | "
+            f"{status} | "
+            f"{_escape_markdown_table(record.content_origin)} | "
+            f"{_escape_markdown_table(record.source_id)} | "
+            f"{title} | "
+            f"{record.word_count} | "
+            f"{http_status} | "
+            f"{_escape_markdown_table(detail)} |"
+        )
+
+    return "\n".join(lines)
+
+
+def _markdown_link(
+    label: str,
+    url: str,
+) -> str:
+    escaped_label = _escape_markdown_table(label).replace(
+        "]",
+        "\\]",
+    )
+    escaped_url = url.replace(
+        ")",
+        "%29",
+    )
+    return f"[{escaped_label}]({escaped_url})"
+
+
+def _escape_markdown_table(
+    value: str,
+) -> str:
+    return (
+        value.replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .strip()
+    )
 
 
 def _render_record(
@@ -617,6 +759,13 @@ def main(
             json.dumps(
                 payload,
                 indent=2,
+            )
+        )
+    elif args.markdown:
+        print(
+            render_markdown_report(
+                report,
+                problems_only=args.problems_only,
             )
         )
     else:
