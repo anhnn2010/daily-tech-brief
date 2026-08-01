@@ -244,7 +244,7 @@ def test_full_content_is_used_only_for_epub(
     assert rendering["epub"]["content_mode"] == "summary"
     assert rendering["epub"]["published_to_site"] is True
     assert rendering["full_epub"]["content_mode"] == "full"
-    assert rendering["full_epub"]["published_to_site"] is False
+    assert rendering["full_epub"]["published_to_site"] is True
 
     payload = json.loads(
         ranked_path.read_text(encoding="utf-8")

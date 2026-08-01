@@ -391,7 +391,7 @@ def _process_and_write_ranked_articles(
                     "article_count": len(selected_articles),
                     "size_bytes": len(full_epub_content),
                     "content_mode": "full",
-                    "published_to_site": False,
+                    "published_to_site": True,
                 }
             else:
                 rendering_summary["full_epub"] = {

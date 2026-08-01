@@ -175,6 +175,9 @@ def test_main_builds_complete_static_site_with_epub(
     assert (site_dir / "archive" / "index.json").is_file()
     assert (site_dir / "site.json").is_file()
     assert (site_dir / ".nojekyll").is_file()
+    assert 'href="digest-full.epub"' in (
+        site_dir / "index.html"
+    ).read_text(encoding="utf-8")
 
     site_metadata = json.loads(
         (site_dir / "site.json").read_text(encoding="utf-8")
@@ -194,9 +197,9 @@ def test_main_builds_complete_static_site_with_epub(
     assert (archive_dir / "ranked_articles.json").is_file()
     assert (archive_dir / "source_report.json").is_file()
 
-    assert not (site_dir / "digest-full.epub").exists()
-    assert not (site_dir / "latest" / "digest-full.epub").exists()
-    assert not (archive_dir / "digest-full.epub").exists()
+    assert (site_dir / "digest-full.epub").is_file()
+    assert (site_dir / "latest" / "digest-full.epub").is_file()
+    assert (archive_dir / "digest-full.epub").is_file()
 
     output_epub = output_dir / "digest.epub"
     published_epubs = (
@@ -207,6 +210,19 @@ def test_main_builds_complete_static_site_with_epub(
     for published_epub in published_epubs:
         assert published_epub.is_file()
         assert published_epub.read_bytes() == output_epub.read_bytes()
+
+    full_epub = output_dir / "digest-full.epub"
+    published_full_epubs = (
+        site_dir / "digest-full.epub",
+        site_dir / "latest" / "digest-full.epub",
+        archive_dir / "digest-full.epub",
+    )
+    for published_full_epub in published_full_epubs:
+        assert published_full_epub.is_file()
+        assert (
+            published_full_epub.read_bytes()
+            == full_epub.read_bytes()
+        )
 
     with zipfile.ZipFile(output_epub) as epub_archive:
         assert epub_archive.read("mimetype") == b"application/epub+zip"
@@ -221,7 +237,6 @@ def test_main_builds_complete_static_site_with_epub(
         assert "Read the original article" not in chapter
         assert "Original source" in chapter
 
-    full_epub = output_dir / "digest-full.epub"
     with zipfile.ZipFile(full_epub) as epub_archive:
         chapter = epub_archive.read("EPUB/category-linux.xhtml").decode(
             "utf-8"
@@ -244,7 +259,7 @@ def test_main_builds_complete_static_site_with_epub(
     assert full_epub_summary["enabled"] is True
     assert full_epub_summary["path"] == str(full_epub)
     assert full_epub_summary["content_mode"] == "full"
-    assert full_epub_summary["published_to_site"] is False
+    assert full_epub_summary["published_to_site"] is True
     assert str(full_epub) in execution_summary["output_paths"]
 
     assert site_metadata["project"]["version"] == "0.7.0"
@@ -257,6 +272,15 @@ def test_main_builds_complete_static_site_with_epub(
         "copied_files"
     ]
     assert str(archive_dir / "digest.epub") in site_summary["copied_files"]
+    assert str(site_dir / "digest-full.epub") in site_summary["copied_files"]
+    assert (
+        str(site_dir / "latest" / "digest-full.epub")
+        in site_summary["copied_files"]
+    )
+    assert (
+        str(archive_dir / "digest-full.epub")
+        in site_summary["copied_files"]
+    )
 
     latest_html = (site_dir / "index.html").read_text(encoding="utf-8")
     assert "Arch Linux workflow update" in latest_html
