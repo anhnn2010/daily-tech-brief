@@ -161,7 +161,9 @@ def test_json_output_can_show_only_uncurated_lessons(
 
 def test_bundled_library_reports_two_curated_lessons() -> None:
     module = _load_module()
-    report = module.load_learning_coverage("learning.yml")
+    report = module.load_learning_coverage(
+        "config/learning_library.yml"
+    )
 
     assert report.total_lessons == 16
     assert report.enabled_lessons == 16
@@ -172,15 +174,20 @@ def test_bundled_library_reports_two_curated_lessons() -> None:
     )
 
 
-def test_script_runs_directly_from_project_root() -> None:
+def test_script_uses_project_root_default_path(
+    tmp_path: Path,
+) -> None:
+    script_path = Path(
+        "scripts/report_learning_coverage.py"
+    ).resolve()
+
     completed = subprocess.run(
         [
             sys.executable,
-            "scripts/report_learning_coverage.py",
-            "--input",
-            "learning.yml",
+            str(script_path),
             "--uncurated-only",
         ],
+        cwd=tmp_path,
         check=False,
         capture_output=True,
         text=True,

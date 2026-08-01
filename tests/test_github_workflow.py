@@ -203,6 +203,52 @@ def test_full_content_summary_handles_missing_generation_output() -> None:
 
 
 
+def test_workflow_publishes_learning_coverage_job_summary() -> None:
+    workflow = read_workflow()
+
+    assert "name: Publish Technical Learning coverage" in workflow
+    assert "if: always()" in workflow
+    assert "config/learning_library.yml" in workflow
+    assert "python scripts/report_learning_coverage.py" in workflow
+    assert "--markdown" in workflow
+    assert "--uncurated-only" in workflow
+    assert 'cat "${coverage_report}" >> "${GITHUB_STEP_SUMMARY}"' in workflow
+
+
+def test_learning_coverage_summary_runs_after_full_content_before_uploads() -> None:
+    workflow = read_workflow()
+
+    full_content_position = workflow.index(
+        "- name: Publish full-content report"
+    )
+    learning_coverage_position = workflow.index(
+        "- name: Publish Technical Learning coverage"
+    )
+    output_upload_position = workflow.index(
+        "- name: Upload digest output artifact"
+    )
+    site_upload_position = workflow.index(
+        "- name: Upload static site artifact"
+    )
+    pages_upload_position = workflow.index(
+        "- name: Upload GitHub Pages artifact"
+    )
+
+    assert full_content_position < learning_coverage_position
+    assert learning_coverage_position < output_upload_position
+    assert learning_coverage_position < site_upload_position
+    assert learning_coverage_position < pages_upload_position
+
+
+def test_learning_coverage_summary_handles_report_errors() -> None:
+    workflow = read_workflow()
+
+    assert "if [[ ! -s config/learning_library.yml ]]" in workflow
+    assert "Coverage report could not be generated." in workflow
+    assert 'coverage_report="${RUNNER_TEMP}/technical-learning-coverage.md"' in workflow
+    assert "exit 0" in workflow
+
+
 def test_full_epub_is_uploaded_only_with_digest_artifact() -> None:
     workflow = read_workflow()
 

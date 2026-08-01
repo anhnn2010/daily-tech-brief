@@ -230,6 +230,34 @@ jobs:
             --problems-only \
             >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Publish Technical Learning coverage
+        if: always()
+        shell: bash
+        run: |
+          if [[ ! -s config/learning_library.yml ]]; then
+            {
+              echo "## Technical Learning coverage"
+              echo
+              echo "Report unavailable because config/learning_library.yml was not found."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          coverage_report="${RUNNER_TEMP}/technical-learning-coverage.md"
+
+          if python scripts/report_learning_coverage.py \
+            --markdown \
+            --uncurated-only \
+            > "${coverage_report}"; then
+            cat "${coverage_report}" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            {
+              echo "## Technical Learning coverage"
+              echo
+              echo "Coverage report could not be generated."
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
       - name: List generated outputs
         run: |
           echo "Generated output files:"

@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any, Iterable
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_LIBRARY_PATH = (
+    _PROJECT_ROOT
+    / "config"
+    / "learning_library.yml"
+)
+
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
@@ -119,8 +125,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("config/learning_library.yml"),
-        help="Path to the Technical Learning library YAML.",
+        default=_DEFAULT_LIBRARY_PATH,
+        help=(
+            "Path to the Technical Learning library YAML. "
+            "Defaults to config/learning_library.yml in the "
+            "project root."
+        ),
     )
     parser.add_argument(
         "--uncurated-only",
