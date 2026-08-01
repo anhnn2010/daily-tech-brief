@@ -197,6 +197,24 @@ jobs:
             --expected-total 12 \
             --expected-learning 1
 
+      - name: Publish full-content report
+        if: always()
+        shell: bash
+        run: |
+          if [[ ! -s output/ranked_articles.json ]]; then
+            {
+              echo "## Full-content EPUB"
+              echo
+              echo "Report unavailable because output/ranked_articles.json was not generated."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          python scripts/report_content_enrichment.py \
+            --markdown \
+            --problems-only \
+            >> "${GITHUB_STEP_SUMMARY}"
+
       - name: List generated outputs
         run: |
           echo "Generated output files:"

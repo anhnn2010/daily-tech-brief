@@ -153,6 +153,51 @@ def test_technical_learning_verification_runs_before_uploads() -> None:
     assert learning_verify_position < deploy_job_position
 
 
+def test_workflow_publishes_full_content_job_summary() -> None:
+    workflow = read_workflow()
+
+    assert "name: Publish full-content report" in workflow
+    assert "if: always()" in workflow
+    assert "output/ranked_articles.json" in workflow
+    assert "python scripts/report_content_enrichment.py" in workflow
+    assert "--markdown" in workflow
+    assert "--problems-only" in workflow
+    assert '>> "${GITHUB_STEP_SUMMARY}"' in workflow
+
+
+def test_full_content_summary_runs_after_verification_before_uploads() -> None:
+    workflow = read_workflow()
+
+    learning_verify_position = workflow.index(
+        "- name: Verify Technical Learning output"
+    )
+    report_position = workflow.index(
+        "- name: Publish full-content report"
+    )
+    output_upload_position = workflow.index(
+        "- name: Upload digest output artifact"
+    )
+    site_upload_position = workflow.index(
+        "- name: Upload static site artifact"
+    )
+    pages_upload_position = workflow.index(
+        "- name: Upload GitHub Pages artifact"
+    )
+
+    assert learning_verify_position < report_position
+    assert report_position < output_upload_position
+    assert report_position < site_upload_position
+    assert report_position < pages_upload_position
+
+
+def test_full_content_summary_handles_missing_generation_output() -> None:
+    workflow = read_workflow()
+
+    assert "if [[ ! -s output/ranked_articles.json ]]" in workflow
+    assert "Report unavailable because" in workflow
+    assert "exit 0" in workflow
+
+
 def test_pages_artifact_is_uploaded_only_for_production() -> None:
     workflow = read_workflow()
 
