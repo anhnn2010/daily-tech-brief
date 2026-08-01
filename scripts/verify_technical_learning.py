@@ -27,6 +27,8 @@ class VerificationResult:
     content_curated: int
     content_summary: int
     content_none: int
+    public_epub_path: Path
+    full_epub_path: Path
     archive_file: Path
     checked_epub_copies: tuple[Path, ...]
 
@@ -94,7 +96,8 @@ def verify_technical_learning_output(
     ranked_path = output_dir / "ranked_articles.json"
     markdown_path = output_dir / "digest.md"
     html_path = output_dir / "digest.html"
-    epub_path = output_dir / "digest.epub"
+    public_epub_path = output_dir / "digest.epub"
+    full_epub_path = output_dir / "digest-full.epub"
 
     payload = _read_json_object(ranked_path)
     articles = payload.get("articles")
@@ -169,7 +172,7 @@ def verify_technical_learning_output(
 
     _verify_learning_content_origins(
         enrichment["records"],
-        learning_titles=learning_titles,
+        learning_articles=learning_articles,
     )
 
     markdown = _read_text(markdown_path)
@@ -206,7 +209,14 @@ def verify_technical_learning_output(
     )
 
     _verify_epub(
-        epub_path,
+        public_epub_path,
+        learning_titles=learning_titles,
+        require_learning=bool(expected_learning),
+        expected_articles=expected_total,
+        expected_full_content=0,
+    )
+    _verify_epub(
+        full_epub_path,
         learning_titles=learning_titles,
         require_learning=bool(expected_learning),
         expected_articles=expected_total,
@@ -223,9 +233,10 @@ def verify_technical_learning_output(
         )
 
     checked_epub_copies = _verify_epub_copies(
-        source_epub=epub_path,
+        source_epub=public_epub_path,
         site_dir=site_dir,
     )
+    _verify_full_epub_not_published(site_dir)
 
     archive_file = _find_latest_archive_payload(site_dir)
     archive_payload = _read_json_object(archive_file)
@@ -264,6 +275,8 @@ def verify_technical_learning_output(
         content_curated=origins["curated"],
         content_summary=origins["summary"],
         content_none=origins["none"],
+        public_epub_path=public_epub_path,
+        full_epub_path=full_epub_path,
         archive_file=archive_file,
         checked_epub_copies=checked_epub_copies,
     )
@@ -412,7 +425,7 @@ def _extract_content_enrichment(
 def _verify_learning_content_origins(
     records: list[dict[str, Any]],
     *,
-    learning_titles: tuple[str, ...],
+    learning_articles: list[dict[str, Any]],
 ) -> None:
     learning_records = [
         record
@@ -420,10 +433,29 @@ def _verify_learning_content_origins(
         if record.get("source_id") == "technical_learning"
     ]
 
-    if len(learning_records) != len(learning_titles):
+    if len(learning_records) != len(learning_articles):
         raise VerificationError(
             "Technical Learning enrichment records do not match "
             "the selected learning articles"
+        )
+
+    curated_by_title: dict[str, bool] = {}
+    for article in learning_articles:
+        title = _require_non_empty_string(
+            article.get("title"),
+            field="Technical Learning article title",
+        )
+        source_tags = article.get("source_tags", [])
+        if not isinstance(source_tags, list) or not all(
+            isinstance(tag, str)
+            for tag in source_tags
+        ):
+            raise VerificationError(
+                "Technical Learning source_tags must be a list "
+                "of strings"
+            )
+        curated_by_title[title] = (
+            "learning_content:curated" in source_tags
         )
 
     record_titles = {
@@ -433,20 +465,43 @@ def _verify_learning_content_origins(
         )
         for record in learning_records
     }
-    if record_titles != set(learning_titles):
+    if record_titles != set(curated_by_title):
         raise VerificationError(
             "Technical Learning enrichment titles do not match "
             "the selected learning articles"
         )
 
     for record in learning_records:
-        if record.get("status") != "extracted":
+        title = _require_non_empty_string(
+            record.get("title"),
+            field="Technical Learning enrichment title",
+        )
+        status = record.get("status")
+        origin = record.get("content_origin")
+        expects_curated = curated_by_title[title]
+
+        if expects_curated:
+            if status != "extracted":
+                raise VerificationError(
+                    "Curated Technical Learning content must be "
+                    "extracted"
+                )
+            if origin != "curated":
+                raise VerificationError(
+                    "Curated Technical Learning content must use "
+                    "curated origin"
+                )
+            continue
+
+        if origin == "curated":
             raise VerificationError(
-                "Technical Learning content must be extracted"
+                "Technical Learning content without the curated "
+                "tag must not use curated origin"
             )
-        if record.get("content_origin") != "curated":
+        if status == "fetch_failed":
             raise VerificationError(
-                "Technical Learning content must use curated origin"
+                "Technical Learning must provide full content or "
+                "a summary fallback"
             )
 
 
@@ -694,6 +749,26 @@ def _verify_epub_copies(
     return tuple(checked)
 
 
+def _verify_full_epub_not_published(
+    site_dir: Path,
+) -> None:
+    leaked_files = sorted(
+        path
+        for path in site_dir.rglob("digest-full.epub")
+        if path.is_file()
+    )
+
+    if leaked_files:
+        leaked = ", ".join(
+            str(path)
+            for path in leaked_files
+        )
+        raise VerificationError(
+            "Full-content EPUB must remain artifact-only; "
+            f"published copies found: {leaked}"
+        )
+
+
 def _find_latest_archive_payload(
     site_dir: Path,
 ) -> Path:
@@ -828,6 +903,8 @@ def _result_payload(
                 "none": result.content_none,
             },
         },
+        "public_epub": str(result.public_epub_path),
+        "full_epub": str(result.full_epub_path),
         "archive_file": str(result.archive_file),
         "checked_epub_copies": [
             str(path)
@@ -916,11 +993,22 @@ def main(argv: list[str] | None = None) -> int:
             f"none={result.content_none}"
         )
         print(
+            f"- Public EPUB:         "
+            f"{result.public_epub_path}"
+        )
+        print(
+            f"- Full EPUB artifact:  "
+            f"{result.full_epub_path}"
+        )
+        print(
             f"- Archive payload:     "
             f"{result.archive_file}"
         )
         for path in result.checked_epub_copies:
-            print(f"- EPUB copy matched:   {path}")
+            print(
+                f"- Public EPUB matched: "
+                f"{path}"
+            )
 
     return 0
 

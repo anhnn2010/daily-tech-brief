@@ -165,6 +165,7 @@ jobs:
         shell: bash
         run: |
           test -s output/digest.epub
+          test -s output/digest-full.epub
           test -s site/digest.epub
           test -s site/latest/digest.epub
 
@@ -178,7 +179,7 @@ jobs:
           )"
 
           if [[ -z "${archive_epub}" ]]; then
-            echo "No archived EPUB was generated." >&2
+            echo "No archived public EPUB was generated." >&2
             exit 1
           fi
 
@@ -186,10 +187,24 @@ jobs:
           cmp output/digest.epub site/latest/digest.epub
           cmp output/digest.epub "${archive_epub}"
 
+          leaked_full_epub="$(
+            find site \
+              -type f \
+              -name 'digest-full.epub' \
+              -print \
+              -quit
+          )"
+
+          if [[ -n "${leaked_full_epub}" ]]; then
+            echo "Full EPUB was published to the site: ${leaked_full_epub}" >&2
+            exit 1
+          fi
+
           grep -q 'href="digest.epub"' site/index.html
           grep -q 'Download EPUB' site/index.html
 
-          echo "Verified EPUB: ${archive_epub}"
+          echo "Verified public EPUB: ${archive_epub}"
+          echo "Verified artifact-only EPUB: output/digest-full.epub"
 
       - name: Verify Technical Learning output
         run: |

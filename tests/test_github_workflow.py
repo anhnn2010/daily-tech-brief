@@ -83,6 +83,7 @@ def test_workflow_verifies_epub_publication() -> None:
 
     assert "name: Verify EPUB publication" in workflow
     assert "test -s output/digest.epub" in workflow
+    assert "test -s output/digest-full.epub" in workflow
     assert "test -s site/digest.epub" in workflow
     assert "test -s site/latest/digest.epub" in workflow
     assert "-path '*/digest.epub'" in workflow
@@ -91,6 +92,9 @@ def test_workflow_verifies_epub_publication() -> None:
     assert "cmp output/digest.epub site/latest/digest.epub" in workflow
     assert 'grep -q \'href="digest.epub"\' site/index.html' in workflow
     assert "grep -q 'Download EPUB' site/index.html" in workflow
+    assert "-name 'digest-full.epub'" in workflow
+    assert "Full EPUB was published to the site" in workflow
+    assert "Verified artifact-only EPUB" in workflow
 
 
 def test_epub_verification_runs_before_artifact_uploads() -> None:
@@ -196,6 +200,16 @@ def test_full_content_summary_handles_missing_generation_output() -> None:
     assert "if [[ ! -s output/ranked_articles.json ]]" in workflow
     assert "Report unavailable because" in workflow
     assert "exit 0" in workflow
+
+
+
+def test_full_epub_is_uploaded_only_with_digest_artifact() -> None:
+    workflow = read_workflow()
+
+    assert "path: output/" in workflow
+    assert "path: site/" in workflow
+    assert "test -s output/digest-full.epub" in workflow
+    assert "-name 'digest-full.epub'" in workflow
 
 
 def test_pages_artifact_is_uploaded_only_for_production() -> None:

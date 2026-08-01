@@ -347,22 +347,57 @@ def _process_and_write_ranked_articles(
 
     if "render_epub" in features:
         if features.get("render_epub", False):
-            epub_path = output_dir / "digest.epub"
-            epub_content = render_epub_digest(
-                epub_articles,
+            public_epub_path = output_dir / "digest.epub"
+            public_epub_content = render_epub_digest(
+                public_articles,
                 config.profile,
                 generated_at=ranking_result.evaluated_at,
                 project_name=str(config.settings["project"]["name"]),
             )
-            _write_bytes_atomic(epub_path, epub_content)
+            _write_bytes_atomic(
+                public_epub_path,
+                public_epub_content,
+            )
             rendering_summary["epub"] = {
                 "enabled": True,
-                "path": str(epub_path),
+                "path": str(public_epub_path),
                 "article_count": len(selected_articles),
-                "size_bytes": len(epub_content),
+                "size_bytes": len(public_epub_content),
+                "content_mode": "summary",
+                "published_to_site": True,
             }
+
+            if features.get("full_content_epub", False):
+                full_epub_path = output_dir / "digest-full.epub"
+                full_epub_content = render_epub_digest(
+                    epub_articles,
+                    config.profile,
+                    generated_at=ranking_result.evaluated_at,
+                    project_name=str(
+                        config.settings["project"]["name"]
+                    ),
+                )
+                _write_bytes_atomic(
+                    full_epub_path,
+                    full_epub_content,
+                )
+                rendering_summary["full_epub"] = {
+                    "enabled": True,
+                    "path": str(full_epub_path),
+                    "article_count": len(selected_articles),
+                    "size_bytes": len(full_epub_content),
+                    "content_mode": "full",
+                    "published_to_site": False,
+                }
+            else:
+                rendering_summary["full_epub"] = {
+                    "enabled": False
+                }
         else:
             rendering_summary["epub"] = {"enabled": False}
+            rendering_summary["full_epub"] = {
+                "enabled": False
+            }
 
     processing_summary["rendering"] = rendering_summary
     payload = {
@@ -579,7 +614,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         rendering = processing_summary.get("rendering", {})
         if isinstance(rendering, dict):
-            for renderer_name in ("markdown", "html", "epub"):
+            for renderer_name in (
+                "markdown",
+                "html",
+                "epub",
+                "full_epub",
+            ):
                 renderer_summary = rendering.get(renderer_name)
                 if (
                     isinstance(renderer_summary, dict)

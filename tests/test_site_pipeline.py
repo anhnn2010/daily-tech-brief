@@ -67,6 +67,7 @@ def make_config(tmp_path: Path) -> ProjectConfig:
                 "render_markdown": True,
                 "render_html": True,
                 "render_epub": True,
+                "full_content_epub": True,
                 "build_site": True,
                 "ai_editor": False,
             },
@@ -91,6 +92,12 @@ def make_collection_result() -> CollectionResult:
         updated_at=None,
         summary="A practical Arch Linux update.",
         author="Example Author",
+        content_html=(
+            "<h2>Full Arch Linux details</h2>"
+            "<p>Private full-text EPUB content.</p>"
+        ),
+        content_text="Private full-text EPUB content.",
+        content_status="extracted",
         fetched_at=collected_at.isoformat().replace("+00:00", "Z"),
     )
     report = SourceReport(
@@ -157,6 +164,7 @@ def test_main_builds_complete_static_site_with_epub(
         "digest.md",
         "digest.html",
         "digest.epub",
+        "digest-full.epub",
     )
     for filename in expected_output_files:
         assert (output_dir / filename).is_file()
@@ -186,6 +194,10 @@ def test_main_builds_complete_static_site_with_epub(
     assert (archive_dir / "ranked_articles.json").is_file()
     assert (archive_dir / "source_report.json").is_file()
 
+    assert not (site_dir / "digest-full.epub").exists()
+    assert not (site_dir / "latest" / "digest-full.epub").exists()
+    assert not (archive_dir / "digest-full.epub").exists()
+
     output_epub = output_dir / "digest.epub"
     published_epubs = (
         site_dir / "digest.epub",
@@ -204,8 +216,18 @@ def test_main_builds_complete_static_site_with_epub(
             "utf-8"
         )
         assert "Arch Linux workflow update" in chapter
+        assert "A practical Arch Linux update." in chapter
+        assert "Private full-text EPUB content." not in chapter
         assert "Read the original article" not in chapter
         assert "Original source" in chapter
+
+    full_epub = output_dir / "digest-full.epub"
+    with zipfile.ZipFile(full_epub) as epub_archive:
+        chapter = epub_archive.read("EPUB/category-linux.xhtml").decode(
+            "utf-8"
+        )
+        assert "Private full-text EPUB content." in chapter
+        assert 'class="article-content full-content"' in chapter
 
     rendering = execution_summary["processing"]["rendering"]
     epub_summary = rendering["epub"]
@@ -214,6 +236,16 @@ def test_main_builds_complete_static_site_with_epub(
     assert epub_summary["article_count"] == 1
     assert epub_summary["size_bytes"] == output_epub.stat().st_size
     assert str(output_epub) in execution_summary["output_paths"]
+
+    assert epub_summary["content_mode"] == "summary"
+    assert epub_summary["published_to_site"] is True
+
+    full_epub_summary = rendering["full_epub"]
+    assert full_epub_summary["enabled"] is True
+    assert full_epub_summary["path"] == str(full_epub)
+    assert full_epub_summary["content_mode"] == "full"
+    assert full_epub_summary["published_to_site"] is False
+    assert str(full_epub) in execution_summary["output_paths"]
 
     assert site_metadata["project"]["version"] == "0.7.0"
     assert site_metadata["article_count"] == 1

@@ -117,7 +117,7 @@ def test_full_content_is_used_only_for_epub(
     monkeypatch,
 ) -> None:
     enrichment_call: dict[str, Any] = {}
-    epub_call: dict[str, Any] = {}
+    epub_calls: list[dict[str, Any]] = []
 
     def fake_enrich(
         articles: Any,
@@ -157,11 +157,24 @@ def test_full_content_is_used_only_for_epub(
         generated_at: str,
         project_name: str,
     ) -> bytes:
-        epub_call["articles"] = tuple(articles)
-        epub_call["profile"] = profile
-        epub_call["generated_at"] = generated_at
-        epub_call["project_name"] = project_name
-        return b"synthetic-epub"
+        captured_articles = tuple(articles)
+        epub_calls.append(
+            {
+                "articles": captured_articles,
+                "profile": profile,
+                "generated_at": generated_at,
+                "project_name": project_name,
+            }
+        )
+        has_full_content = any(
+            ranked.article.has_full_content
+            for ranked in captured_articles
+        )
+        return (
+            b"full-epub"
+            if has_full_content
+            else b"summary-epub"
+        )
 
     monkeypatch.setattr(
         main_module,
@@ -191,9 +204,24 @@ def test_full_content_is_used_only_for_epub(
         "Linux Article Two",
     ]
 
+    assert len(epub_calls) == 2
+
+    public_epub_articles = tuple(
+        ranked.article
+        for ranked in epub_calls[0]["articles"]
+    )
+    assert all(
+        article.content_status == "not_requested"
+        for article in public_epub_articles
+    )
+    assert all(
+        not article.has_full_content
+        for article in public_epub_articles
+    )
+
     epub_articles = tuple(
         ranked.article
-        for ranked in epub_call["articles"]
+        for ranked in epub_calls[1]["articles"]
     )
     assert [
         article.content_status
@@ -205,7 +233,18 @@ def test_full_content_is_used_only_for_epub(
     assert "Private EPUB body 1." in epub_articles[0].content_html
     assert "Private EPUB body 2." in epub_articles[1].content_html
 
-    assert (tmp_path / "digest.epub").read_bytes() == b"synthetic-epub"
+    assert (
+        tmp_path / "digest.epub"
+    ).read_bytes() == b"summary-epub"
+    assert (
+        tmp_path / "digest-full.epub"
+    ).read_bytes() == b"full-epub"
+
+    rendering = summary["rendering"]
+    assert rendering["epub"]["content_mode"] == "summary"
+    assert rendering["epub"]["published_to_site"] is True
+    assert rendering["full_epub"]["content_mode"] == "full"
+    assert rendering["full_epub"]["published_to_site"] is False
 
     payload = json.loads(
         ranked_path.read_text(encoding="utf-8")
@@ -251,7 +290,7 @@ def test_disabled_feature_does_not_enrich_articles(
     def fail_if_called(*args: Any, **kwargs: Any) -> Any:
         raise AssertionError("content enrichment must remain disabled")
 
-    captured: dict[str, Any] = {}
+    captured: dict[str, Any] = {"calls": 0}
 
     def fake_render_epub(
         articles: Any,
@@ -260,6 +299,7 @@ def test_disabled_feature_does_not_enrich_articles(
         generated_at: str,
         project_name: str,
     ) -> bytes:
+        captured["calls"] += 1
         captured["articles"] = tuple(articles)
         return b"summary-epub"
 
@@ -282,10 +322,17 @@ def test_disabled_feature_does_not_enrich_articles(
     )
 
     assert "content_enrichment" not in summary
+    assert captured["calls"] == 1
     assert all(
         ranked.article.content_status == "not_requested"
         for ranked in captured["articles"]
     )
+
+    assert (tmp_path / "digest.epub").is_file()
+    assert not (tmp_path / "digest-full.epub").exists()
+    assert summary["rendering"]["full_epub"] == {
+        "enabled": False
+    }
 
     payload = json.loads(
         ranked_path.read_text(encoding="utf-8")

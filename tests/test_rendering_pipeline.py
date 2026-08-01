@@ -142,6 +142,11 @@ def test_processing_pipeline_writes_markdown_html_and_epub_digests(
             "path": str(epub_path),
             "article_count": 2,
             "size_bytes": epub_size,
+            "content_mode": "summary",
+            "published_to_site": True,
+        },
+        "full_epub": {
+            "enabled": False,
         },
     }
 
@@ -190,6 +195,9 @@ def test_processing_pipeline_skips_epub_when_disabled(
 
     assert not (tmp_path / "digest.epub").exists()
     assert summary["rendering"]["epub"] == {"enabled": False}
+    assert summary["rendering"]["full_epub"] == {
+        "enabled": False
+    }
 
     html = (tmp_path / "digest.html").read_text(encoding="utf-8")
     assert "Download EPUB" not in html
@@ -198,6 +206,9 @@ def test_processing_pipeline_skips_epub_when_disabled(
 
     payload = json.loads(ranked_path.read_text(encoding="utf-8"))
     assert payload["summary"]["rendering"]["epub"] == {"enabled": False}
+    assert payload["summary"]["rendering"]["full_epub"] == {
+        "enabled": False
+    }
 
 
 def test_processing_pipeline_keeps_legacy_summary_without_epub_setting(

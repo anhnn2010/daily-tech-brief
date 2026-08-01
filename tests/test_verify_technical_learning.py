@@ -164,6 +164,11 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
             "title": "Phase-Locked Loop Fundamentals",
             "url": "https://example.com/pll",
             "external_id": "learning:pll_fundamentals",
+            "source_tags": [
+                "technical_learning",
+                "learning_lesson_id:pll_fundamentals",
+                "learning_content:curated",
+            ],
             "content_html": "",
             "content_text": "",
             "content_status": "not_requested",
@@ -210,11 +215,21 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
     (output_dir / "digest.html").write_text(html, encoding="utf-8")
     (site_dir / "index.html").write_text(html, encoding="utf-8")
 
-    output_epub = output_dir / "digest.epub"
-    _write_epub(output_epub)
-    epub_bytes = output_epub.read_bytes()
-    (site_dir / "digest.epub").write_bytes(epub_bytes)
-    (site_dir / "latest" / "digest.epub").write_bytes(epub_bytes)
+    public_epub = output_dir / "digest.epub"
+    _write_epub(
+        public_epub,
+        full_content_count=0,
+    )
+    full_epub = output_dir / "digest-full.epub"
+    _write_epub(full_epub)
+
+    public_epub_bytes = public_epub.read_bytes()
+    (site_dir / "digest.epub").write_bytes(
+        public_epub_bytes
+    )
+    (site_dir / "latest" / "digest.epub").write_bytes(
+        public_epub_bytes
+    )
 
     return output_dir, site_dir
 
@@ -243,6 +258,8 @@ def test_verifies_learning_and_full_text_epub_output(
     assert result.content_curated == 1
     assert result.content_summary == 8
     assert result.content_none == 2
+    assert result.public_epub_path == output_dir / "digest.epub"
+    assert result.full_epub_path == output_dir / "digest-full.epub"
 
 
 def test_accepts_legacy_nested_processing_summary(
@@ -369,6 +386,7 @@ def test_rejects_missing_article_page_break_rules(
     _write_epub(
         output_dir / "digest.epub",
         include_page_breaks=False,
+        full_content_count=0,
     )
 
     with pytest.raises(
@@ -413,6 +431,67 @@ def test_rejects_corrupt_epub(
     with pytest.raises(
         VerificationError,
         match="not a valid EPUB ZIP archive",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_corrupt_full_epub(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    (output_dir / "digest-full.epub").write_bytes(
+        b"not-an-epub"
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match="not a valid EPUB ZIP archive",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_full_epub_published_to_site(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    (site_dir / "digest-full.epub").write_bytes(
+        (output_dir / "digest-full.epub").read_bytes()
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match="must remain artifact-only",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_full_content_in_public_epub(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    _write_epub(
+        output_dir / "digest.epub",
+        full_content_count=1,
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match="full-content articles; expected 0",
     ):
         verify_technical_learning_output(
             output_dir=output_dir,
@@ -507,6 +586,102 @@ def test_rejects_incompatible_status_and_origin(
             expected_total=12,
             expected_learning=1,
         )
+
+
+def _write_ranked_payload_to_output_and_archive(
+    *,
+    output_dir: Path,
+    site_dir: Path,
+    payload: dict[str, object],
+) -> None:
+    text = json.dumps(payload, indent=2)
+    (output_dir / "ranked_articles.json").write_text(
+        text,
+        encoding="utf-8",
+    )
+    archive_files = list(
+        (site_dir / "archive").rglob("ranked_articles.json")
+    )
+    assert len(archive_files) == 1
+    archive_files[0].write_text(
+        text,
+        encoding="utf-8",
+    )
+
+
+def test_accepts_uncurated_learning_summary_fallback(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+
+    learning_article = payload["articles"][11]
+    learning_article["source_tags"] = [
+        "technical_learning",
+        "learning_lesson_id:pll_fundamentals",
+    ]
+
+    enrichment = payload["summary"]["content_enrichment"]
+    learning_record = enrichment["records"][11]
+    learning_record["status"] = "summary_fallback"
+    learning_record["content_origin"] = "summary"
+    enrichment["extracted_articles"] = 1
+    enrichment["summary_fallback_articles"] = 9
+
+    _write_ranked_payload_to_output_and_archive(
+        output_dir=output_dir,
+        site_dir=site_dir,
+        payload=payload,
+    )
+    _write_epub(
+        output_dir / "digest-full.epub",
+        full_content_count=1,
+    )
+
+    result = verify_technical_learning_output(
+        output_dir=output_dir,
+        site_dir=site_dir,
+        expected_total=12,
+        expected_learning=1,
+    )
+
+    assert result.content_extracted == 1
+    assert result.content_fallback == 9
+    assert result.content_curated == 0
+    assert result.content_summary == 9
+
+
+def test_accepts_uncurated_learning_web_extraction(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    ranked_path = output_dir / "ranked_articles.json"
+    payload = json.loads(ranked_path.read_text(encoding="utf-8"))
+
+    payload["articles"][11]["source_tags"] = [
+        "technical_learning",
+        "learning_lesson_id:pll_fundamentals",
+    ]
+    payload["summary"]["content_enrichment"]["records"][11][
+        "content_origin"
+    ] = "web"
+
+    _write_ranked_payload_to_output_and_archive(
+        output_dir=output_dir,
+        site_dir=site_dir,
+        payload=payload,
+    )
+
+    result = verify_technical_learning_output(
+        output_dir=output_dir,
+        site_dir=site_dir,
+        expected_total=12,
+        expected_learning=1,
+    )
+
+    assert result.content_web == 2
+    assert result.content_curated == 0
 
 
 def test_rejects_non_curated_learning_origin(
