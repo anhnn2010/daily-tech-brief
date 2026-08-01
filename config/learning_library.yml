@@ -457,6 +457,424 @@ lessons:
 
     '
   enabled: true
+  content_html: |-
+    <h2>Why a stable reference matters</h2>
+
+    <p>
+    Most analog and mixed-signal circuits need at least one voltage or current that
+    changes as little as possible when supply voltage, process, and temperature
+    change. An ADC compares an input against a reference. An LDO compares its output
+    against a reference. A bias generator, oscillator, PLL, sensor interface, or
+    calibration engine may also derive its operating point from the same reference.
+    If that reference moves, many apparently unrelated measurements move with it.
+    </p>
+
+    <p>
+    A bandgap reference is a classic way to create a relatively temperature-stable
+    voltage in silicon. The central idea is not that any individual device has a
+    perfectly constant voltage. Instead, the circuit combines two quantities with
+    opposite temperature behavior so that their first-order temperature coefficients
+    cancel.
+    </p>
+
+    <h2>The two temperature behaviors</h2>
+
+    <h3>CTAT behavior</h3>
+
+    <p>
+    The base-to-emitter voltage of a bipolar transistor decreases as temperature
+    rises when the collector current is held appropriately. This behavior is called
+    <em>complementary to absolute temperature</em>, or CTAT.
+    </p>
+
+    <p>
+    Around room temperature, a silicon junction voltage often changes by roughly a
+    few millivolts per degree Celsius, depending on current density and operating
+    conditions. The exact slope is not universal, but the important point is its
+    negative sign:
+    </p>
+
+    <pre><code>Temperature increases
+    → V_BE decreases
+    → CTAT voltage
+    </code></pre>
+
+    <h3>PTAT behavior</h3>
+
+    <p>
+    A voltage proportional to absolute temperature, or PTAT, can be produced by
+    operating two bipolar junctions at different current densities. The difference
+    between their base-to-emitter voltages is:
+    </p>
+
+    <pre><code>ΔV_BE = (kT / q) · ln(J_1 / J_2)
+    </code></pre>
+
+    <p>
+    Here, <code>k</code> is Boltzmann's constant, <code>T</code> is absolute
+    temperature, <code>q</code> is electron charge, and <code>J_1/J_2</code> is the
+    current-density ratio. Because <code>kT/q</code> increases linearly with absolute
+    temperature, <code>ΔV_BE</code> has a positive temperature coefficient.
+    </p>
+
+    <pre><code>Temperature increases
+    → ΔV_BE increases
+    → PTAT voltage
+    </code></pre>
+
+    <h2>First-order temperature cancellation</h2>
+
+    <p>
+    A basic bandgap reference adds a CTAT junction voltage to a scaled PTAT voltage:
+    </p>
+
+    <pre><code>V_REF = V_BE + K · ΔV_BE
+    </code></pre>
+
+    <p>
+    The scale factor <code>K</code> is chosen so that the positive PTAT slope
+    approximately cancels the negative CTAT slope near the target temperature range.
+    In many implementations, the scale factor is created with resistor ratios.
+    </p>
+
+    <p>
+    The resulting voltage is close to the extrapolated silicon bandgap voltage,
+    which is why the circuit is called a bandgap reference. The commonly observed
+    reference level is around 1.2 V, but practical implementations may generate
+    different external values by scaling currents or voltages.
+    </p>
+
+    <p>
+    The cancellation is only first-order. The junction voltage has curvature with
+    temperature, resistor temperature coefficients are not ideal, and amplifier
+    offset changes the result. A well-designed circuit can still be highly stable,
+    but it is never perfectly flat.
+    </p>
+
+    <h2>A useful current-based view</h2>
+
+    <p>
+    Many bandgap circuits are easier to understand as current generators. A PTAT
+    voltage is forced across a resistor to create a PTAT current:
+    </p>
+
+    <pre><code>I_PTAT = ΔV_BE / R_PTAT
+    </code></pre>
+
+    <p>
+    A second branch produces a CTAT-related current from a junction voltage:
+    </p>
+
+    <pre><code>I_CTAT ≈ V_BE / R_CTAT
+    </code></pre>
+
+    <p>
+    The currents are summed and passed through another resistor to create the
+    reference voltage. This current-mode view is useful because the same PTAT and
+    CTAT currents can also bias other blocks, feed temperature sensors, or be copied
+    through current mirrors.
+    </p>
+
+    <h2>Common architecture blocks</h2>
+
+    <h3>Bipolar devices</h3>
+
+    <p>
+    Bandgap references depend on predictable junction behavior. In a CMOS process,
+    the required devices may be vertical or lateral parasitic bipolar transistors.
+    Their gain, series resistance, matching, and substrate interaction can differ
+    from discrete BJTs, so the process device model and layout recommendations are
+    important.
+    </p>
+
+    <h3>Resistor ratios</h3>
+
+    <p>
+    Absolute resistor value affects current and power, while resistor ratios often
+    set the PTAT weighting. Ratio matching is usually more accurate than absolute
+    resistance. Identical resistor type, orientation, unit segmentation, dummy
+    structures, and symmetric routing help preserve the intended ratio.
+    </p>
+
+    <h3>Amplifier or feedback loop</h3>
+
+    <p>
+    Many bandgap topologies use an amplifier to force two nodes to the same voltage
+    or to enforce a desired current-density ratio. Amplifier offset directly changes
+    the reference. Finite gain, input common-mode range, output swing, noise, and
+    stability also matter.
+    </p>
+
+    <h3>Current mirrors</h3>
+
+    <p>
+    Current mirrors distribute PTAT and CTAT currents between branches. Mirror
+    mismatch, output resistance, and unequal drain voltages introduce systematic
+    error. A bandgap can therefore inherit the same compliance and matching problems
+    as the mirrors around it.
+    </p>
+
+    <h3>Startup circuit</h3>
+
+    <p>
+    Many self-biased bandgap cores have two mathematical operating points: the
+    desired bias point and a zero-current state. A startup circuit temporarily pushes
+    the core away from the zero-current state. After startup, that circuit must
+    release cleanly and avoid disturbing normal operation.
+    </p>
+
+    <h2>Why startup deserves special attention</h2>
+
+    <p>
+    A schematic may converge correctly in a normal simulation while silicon
+    occasionally remains in the zero-current state. Startup sensitivity can depend
+    on supply ramp rate, residual charge, leakage, temperature, power sequencing,
+    and previous operating state.
+    </p>
+
+    <p>
+    Useful startup validation includes:
+    </p>
+
+    <ul>
+      <li>slow, medium, and fast supply ramps;</li>
+      <li>cold startup, room-temperature startup, and hot startup;</li>
+      <li>repeated power cycling;</li>
+      <li>partial rail cycling;</li>
+      <li>brownout and supply dip recovery;</li>
+      <li>reset while analog power remains present;</li>
+      <li>startup with external loads connected.</li>
+    </ul>
+
+    <p>
+    Measure both success rate and settling time. A circuit that starts 999 times out
+    of 1000 can still be a serious production problem.
+    </p>
+
+    <h2>Temperature curvature</h2>
+
+    <p>
+    First-order cancellation makes the reference flat near a chosen operating
+    region, but residual curvature remains. A temperature plot may look like a bowl,
+    an inverted bowl, or an asymmetric curve. The room-temperature slope alone does
+    not describe total error across the full range.
+    </p>
+
+    <p>
+    Curvature correction techniques add nonlinear terms that more closely match the
+    junction-voltage behavior. Examples include piecewise currents, higher-order
+    temperature terms, resistor temperature-coefficient combinations, or digitally
+    controlled trimming. These approaches can improve accuracy but add area,
+    complexity, verification effort, and possible discontinuities.
+    </p>
+
+    <h2>Supply sensitivity and PSRR</h2>
+
+    <p>
+    A reference must reject supply variation as well as temperature variation. Line
+    regulation measures the low-frequency change in output voltage versus supply:
+    </p>
+
+    <pre><code>Line regulation = ΔV_REF / ΔV_SUPPLY
+    </code></pre>
+
+    <p>
+    Power-supply rejection ratio describes how supply noise couples into the
+    reference over frequency. The amplifier, current mirrors, startup network,
+    biasing, and output buffer can all create coupling paths.
+    </p>
+
+    <p>
+    Low-frequency PSRR may be good because feedback corrects the error, while
+    high-frequency PSRR degrades when loop gain falls. Package and board coupling can
+    also dominate at frequencies not represented by a simple DC supply sweep.
+    </p>
+
+    <h2>Voltage headroom and low-voltage operation</h2>
+
+    <p>
+    A traditional bandgap output near 1.2 V cannot operate from a supply below that
+    level without special architecture. Even above 1.2 V, internal stacked devices
+    and amplifier output swing may require additional headroom.
+    </p>
+
+    <p>
+    Low-voltage references often generate PTAT and CTAT currents and combine them
+    across a smaller resistor, producing an output below the silicon bandgap voltage.
+    These circuits are still called bandgap-derived references because they use the
+    same temperature-cancellation principle.
+    </p>
+
+    <p>
+    During validation, sweep supply below and above the specified range. This reveals
+    the minimum operating voltage, recovery behavior, and whether the reference
+    enters an unexpected state near dropout.
+    </p>
+
+    <h2>Noise and dynamic behavior</h2>
+
+    <p>
+    Reference noise appears directly in ADC codes, regulator output, oscillator
+    frequency, or bias currents. Important noise contributors include the amplifier,
+    resistors, bipolar devices, current mirrors, and output buffer.
+    </p>
+
+    <p>
+    A large output capacitor may reduce broadband noise but increase startup time or
+    create stability problems. A noisy digital environment can couple through
+    supply, substrate, clock, or trim-control paths. Measurements should therefore
+    include both quiet standalone conditions and realistic system activity.
+    </p>
+
+    <h2>Trimming and calibration</h2>
+
+    <p>
+    Process variation moves the nominal reference voltage and its temperature slope.
+    Production designs often include resistor, current, or voltage trim codes.
+    Trimming may target room-temperature accuracy, temperature coefficient, or both.
+    </p>
+
+    <p>
+    A one-point trim improves room-temperature value but may not remove curvature or
+    slope error. A two-temperature trim can estimate and correct slope, at the cost
+    of test time. More complex trims can improve accuracy further but require robust
+    algorithms and nonvolatile storage.
+    </p>
+
+    <p>
+    For a trim sweep, verify:
+    </p>
+
+    <ul>
+      <li>monotonic code-to-voltage behavior;</li>
+      <li>expected step size;</li>
+      <li>coverage of process extremes;</li>
+      <li>absence of missing or duplicate effective codes;</li>
+      <li>repeatability after power cycling;</li>
+      <li>correct loading from fuse or OTP storage;</li>
+      <li>interaction with temperature and supply.</li>
+    </ul>
+
+    <h2>Layout and matching considerations</h2>
+
+    <p>
+    Bandgap accuracy depends heavily on matching. Devices that should match must see
+    similar orientation, surroundings, thermal environment, stress, and routing.
+    Common-centroid placement can reduce linear gradients. Dummy devices can improve
+    edge symmetry. Guard rings and isolation can reduce substrate interference.
+    </p>
+
+    <p>
+    Thermal gradients deserve special attention. A nearby power transistor, clock
+    driver, or regulator can warm one junction more than another, changing
+    <code>ΔV_BE</code>. The electrical design may be symmetric while the thermal
+    environment is not.
+    </p>
+
+    <h2>Post-silicon validation plan</h2>
+
+    <h3>1. Room-temperature nominal value</h3>
+
+    <p>
+    Measure the reference with a calibrated instrument and a known load. Record
+    supply voltage, temperature, trim code, startup history, and settling time.
+    Avoid hiding a systematic offset by reporting only rounded values.
+    </p>
+
+    <h3>2. Temperature sweep</h3>
+
+    <p>
+    Measure enough temperature points to reveal curvature. Three points can estimate
+    a trend but may miss a maximum or minimum between them. Use controlled soak time
+    and confirm that the die has reached thermal equilibrium.
+    </p>
+
+    <p>
+    Useful metrics include:
+    </p>
+
+    <pre><code>Peak-to-peak variation
+    Temperature coefficient in ppm/°C
+    Maximum absolute error
+    Room-temperature error
+    Curve shape
+    </code></pre>
+
+    <h3>3. Supply sweep</h3>
+
+    <p>
+    Sweep supply across and slightly beyond the valid range. Measure reference
+    voltage, supply current, dropout point, startup behavior, and hysteresis between
+    upward and downward sweeps.
+    </p>
+
+    <h3>4. Load regulation</h3>
+
+    <p>
+    If the reference drives external or internal loads, sweep output current. A
+    buffered reference may have a specified load range; an unbuffered core may be
+    sensitive even to probe leakage.
+    </p>
+
+    <h3>5. Startup matrix</h3>
+
+    <p>
+    Combine ramp rate, temperature, supply level, reset state, and repeated cycles.
+    Automate the test so rare failures are counted rather than missed.
+    </p>
+
+    <h3>6. Noise and interference</h3>
+
+    <p>
+    Measure spectral noise when nearby digital blocks are idle and active. Toggle
+    clocks, communication interfaces, high-current loads, and calibration engines to
+    identify coupling paths.
+    </p>
+
+    <h3>7. Multi-unit statistics</h3>
+
+    <p>
+    Collect results across devices, wafers, lots, and sites when available. Separate
+    mean shift from random spread. Correlate reference error with trim code, supply
+    current, temperature sensor output, and other analog observables.
+    </p>
+
+    <h2>Debugging an unexpected reference value</h2>
+
+    <ol>
+      <li>Confirm the instrument, probe loading, grounding, and measurement point.</li>
+      <li>Check that the intended trim code was loaded.</li>
+      <li>Measure the relevant supply and internal bias current.</li>
+      <li>Repeat after a complete power cycle.</li>
+      <li>Change supply slowly to look for dropout or hysteresis.</li>
+      <li>Compare cold, room, and hot behavior.</li>
+      <li>Disable nearby noisy blocks where possible.</li>
+      <li>Compare the failure signature across multiple devices.</li>
+    </ol>
+
+    <p>
+    A high reference voltage may come from incorrect PTAT weighting, resistor ratio
+    error, amplifier offset, trim loading, leakage, or a measurement-path problem.
+    A low value may come from insufficient headroom, startup failure, excessive load,
+    or a weak bias branch. The shape versus temperature and supply is often more
+    diagnostic than one absolute number.
+    </p>
+
+    <h2>Practical takeaway</h2>
+
+    <p>
+    A bandgap reference creates stability by combining imperfect quantities with
+    opposite temperature coefficients. Its final accuracy depends on junction
+    behavior, resistor ratios, amplifier offset, current-mirror matching, startup,
+    headroom, trimming, layout, noise, and thermal environment.
+    </p>
+
+    <p>
+    For post-silicon validation, do not treat the reference as one room-temperature
+    voltage. Characterize it as a surface over temperature, supply, load, trim code,
+    startup condition, and system activity. That broader view turns a basic voltage
+    measurement into evidence about the health of the entire analog bias system.
+    </p>
 - id: voltage_reference_fundamentals
   order: 30
   title: Understanding and Applying Voltage References

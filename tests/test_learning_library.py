@@ -98,9 +98,19 @@ def test_loads_bundled_learning_library() -> None:
     assert len(library.enabled_lessons) == 16
     assert library.lessons[0].id == "current_mirror_types"
     assert library.lessons[-1].id == "shmoo_and_silent_errors"
-    assert len(library.lessons[0].content_html) > 8_000
+    current_mirror = library.lessons[0]
+    bandgap = library.lessons[1]
+
+    assert current_mirror.id == "current_mirror_types"
+    assert len(current_mirror.content_html) > 8_000
     assert "Why current mirrors matter" in (
-        library.lessons[0].content_html
+        current_mirror.content_html
+    )
+
+    assert bandgap.id == "bandgap_reference_intro"
+    assert len(bandgap.content_html) > 8_000
+    assert "Why a stable reference matters" in (
+        bandgap.content_html
     )
 
     tracks = {
