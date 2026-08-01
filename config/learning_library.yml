@@ -898,6 +898,531 @@ lessons:
 
     '
   enabled: true
+  content_html: |-
+    <h2>What a voltage reference is</h2>
+
+    <p>
+    A voltage reference provides a known electrical level that other circuits use
+    as a measurement or control standard. An ADC converts its input relative to a
+    reference. A DAC produces an output relative to a reference. A regulator may
+    compare its feedback voltage with an internal reference. Calibration engines,
+    bias networks, comparators, sensors, and test circuits may also depend on the
+    same reference.
+    </p>
+
+    <p>
+    A reference is not simply a low-power voltage regulator. A regulator is usually
+    optimized to deliver current while maintaining an output voltage. A precision
+    reference is optimized for accuracy, temperature stability, low noise,
+    repeatability, and long-term behavior, often at much lower output current.
+    Some devices include an output buffer and can drive a meaningful load, while
+    others require an external buffer.
+    </p>
+
+    <h2>Why reference errors spread through a system</h2>
+
+    <p>
+    For an ideal N-bit ADC with input range from zero to the reference voltage, one
+    least-significant bit is:
+    </p>
+
+    <pre><code>1 LSB = V_REF / 2^N
+    </code></pre>
+
+    <p>
+    If the reference changes by one percent, the converter gain changes by roughly
+    one percent. A calibration performed with one reference voltage can therefore
+    become wrong when temperature, load, or supply changes the reference later.
+    </p>
+
+    <p>
+    Reference quality can affect:
+    </p>
+
+    <ul>
+      <li>ADC gain accuracy and code transition locations;</li>
+      <li>DAC output gain and full-scale range;</li>
+      <li>comparator thresholds;</li>
+      <li>LDO or DC-DC output accuracy;</li>
+      <li>sensor excitation and bridge measurements;</li>
+      <li>PLL, oscillator, or bias calibration thresholds;</li>
+      <li>production-test limits and guard bands.</li>
+    </ul>
+
+    <h2>Common reference technologies</h2>
+
+    <h3>Bandgap-derived references</h3>
+
+    <p>
+    Bandgap circuits combine a CTAT junction voltage with a scaled PTAT voltage.
+    They are widely integrated in CMOS and bipolar processes. The nominal voltage
+    is often near 1.2 V, although buffering and scaling can produce lower or higher
+    external reference levels.
+    </p>
+
+    <p>
+    Strengths include easy integration, moderate power, and useful performance over
+    a broad temperature range. Limitations include residual curvature, amplifier
+    offset, resistor mismatch, startup behavior, noise, and process variation.
+    </p>
+
+    <h3>Buried-Zener references</h3>
+
+    <p>
+    A buried-Zener reference uses a subsurface breakdown junction chosen for low
+    noise and long-term stability. These devices are often used in high-precision
+    standalone references and instrumentation. They typically require more voltage
+    and current than low-power bandgap references.
+    </p>
+
+    <p>
+    Buried-Zener products can offer excellent drift and noise performance, but they
+    are less convenient for low-voltage integrated systems. Warm-up behavior and
+    power dissipation may also matter.
+    </p>
+
+    <h3>XFET and other proprietary structures</h3>
+
+    <p>
+    Some precision references use junction field-effect transistor structures or
+    other proprietary device combinations. The exact circuit may not be disclosed,
+    so system design should rely on measured specifications rather than assumptions
+    about internal topology.
+    </p>
+
+    <h3>Digital or calibrated references</h3>
+
+    <p>
+    Modern systems may combine an analog reference core with factory trim, OTP
+    codes, temperature compensation, chopping, auto-zero amplifiers, or digital
+    calibration. These techniques improve performance but add startup sequencing,
+    code-loading, and state-retention dependencies.
+    </p>
+
+    <h2>Important datasheet specifications</h2>
+
+    <h3>Initial accuracy</h3>
+
+    <p>
+    Initial accuracy is the output error under specified nominal conditions,
+    typically room temperature, nominal supply, and a defined load. It includes
+    production spread after any factory trim.
+    </p>
+
+    <pre><code>Initial error percent =
+        100 · (V_MEASURED − V_NOMINAL) / V_NOMINAL
+    </code></pre>
+
+    <p>
+    Initial accuracy does not describe temperature drift, noise, or long-term
+    change. A reference with excellent room-temperature accuracy can perform poorly
+    over temperature.
+    </p>
+
+    <h3>Temperature coefficient</h3>
+
+    <p>
+    Temperature coefficient is commonly reported in parts per million per degree
+    Celsius:
+    </p>
+
+    <pre><code>TC ≈
+        10^6 · (V_MAX − V_MIN)
+        / (V_NOMINAL · temperature_range)
+    </code></pre>
+
+    <p>
+    This endpoint-style calculation is useful for comparison but does not fully
+    describe curve shape. A reference may have a low average coefficient while
+    showing a significant bow between the endpoints. For characterization, preserve
+    the full voltage-versus-temperature curve.
+    </p>
+
+    <h3>Line regulation</h3>
+
+    <p>
+    Line regulation describes sensitivity to supply voltage:
+    </p>
+
+    <pre><code>Line regulation = ΔV_OUT / ΔV_SUPPLY
+    </code></pre>
+
+    <p>
+    It may be specified in microvolts per volt or parts per million per volt. The
+    measurement should be made after settling and within the valid operating range.
+    Near minimum supply voltage, internal devices may lose headroom and the response
+    can become nonlinear.
+    </p>
+
+    <h3>Load regulation</h3>
+
+    <p>
+    Load regulation describes output change versus load current:
+    </p>
+
+    <pre><code>Load regulation = ΔV_OUT / ΔI_LOAD
+    </code></pre>
+
+    <p>
+    Some references can only source current. Some can source and sink. Others are
+    intended to drive only a high-impedance load. A converter reference input may
+    draw dynamic current even when its average input resistance appears high.
+    </p>
+
+    <h3>Dropout voltage</h3>
+
+    <p>
+    Dropout is the minimum difference between supply and reference output required
+    to maintain regulation. It is especially important for 2.5 V, 4.096 V, or 5 V
+    references operating from a limited supply.
+    </p>
+
+    <p>
+    A reference may continue producing a voltage below its specified headroom, but
+    accuracy, noise, and load capability can degrade. Post-silicon testing should
+    find both the functional dropout point and the point where accuracy first leaves
+    the required limit.
+    </p>
+
+    <h3>Quiescent current</h3>
+
+    <p>
+    Quiescent current affects power budgets and self-heating. Ultra-low-power
+    references may trade noise, settling time, output drive, or startup robustness
+    for current consumption.
+    </p>
+
+    <h3>Long-term drift</h3>
+
+    <p>
+    Long-term drift is the output change over weeks, months, or years after initial
+    operation. It can come from package stress relaxation, device aging, dielectric
+    effects, contamination, and mechanical or thermal history.
+    </p>
+
+    <p>
+    Long-term drift is not usually linear with time. Extrapolating a short
+    measurement to many years can be misleading. Precision systems may require
+    periodic calibration even when temperature performance is excellent.
+    </p>
+
+    <h3>Hysteresis</h3>
+
+    <p>
+    Thermal hysteresis means the output at a given temperature depends on the
+    previous temperature excursion. A device measured at 25 °C after heating may not
+    return to exactly the same value as after cooling. Package stress and device
+    history contribute to this behavior.
+    </p>
+
+    <h2>Reference noise</h2>
+
+    <h3>Broadband noise density</h3>
+
+    <p>
+    Noise density is often specified in nanovolts per square root hertz. To estimate
+    RMS noise over a bandwidth, integrate the noise spectral density:
+    </p>
+
+    <pre><code>V_NOISE,RMS =
+        sqrt( integral from f1 to f2 of e_n(f)^2 df )
+    </code></pre>
+
+    <p>
+    If the density is approximately flat over the band, a simple estimate is:
+    </p>
+
+    <pre><code>V_NOISE,RMS ≈ e_n · sqrt(bandwidth)
+    </code></pre>
+
+    <h3>Low-frequency noise</h3>
+
+    <p>
+    Low-frequency or 1/f noise matters in precision DC systems. Datasheets often
+    report peak-to-peak noise over a band such as 0.1 Hz to 10 Hz. This value cannot
+    be compared directly with a broadband RMS specification without considering the
+    measurement method and statistical meaning.
+    </p>
+
+    <h3>Noise in converter systems</h3>
+
+    <p>
+    Reference noise appears as gain noise in an ADC or DAC. For a converter operating
+    near full scale, reference noise can directly modulate codes. At small input
+    levels, other noise sources may dominate, but the reference still affects gain
+    stability.
+    </p>
+
+    <p>
+    A reference filter can reduce noise but may create startup or stability problems.
+    The filter impedance must also support the dynamic current demanded by the
+    converter reference input.
+    </p>
+
+    <h2>Output impedance and dynamic loading</h2>
+
+    <p>
+    A real reference has nonzero output impedance that changes with frequency. A
+    successive-approximation ADC may draw bursts of charge from its reference pin
+    during conversion. If the reference or buffer cannot replenish this charge, the
+    reference node moves and produces conversion error.
+    </p>
+
+    <p>
+    A local capacitor acts as a charge reservoir. However, the capacitor interacts
+    with the reference output stage, series resistance, package inductance, and PCB
+    routing. More capacitance is not automatically better.
+    </p>
+
+    <p>
+    Useful questions include:
+    </p>
+
+    <ul>
+      <li>What capacitor range is stable?</li>
+      <li>Is a minimum ESR required?</li>
+      <li>How close must the capacitor be to the load?</li>
+      <li>Does the reference tolerate ceramic capacitors?</li>
+      <li>How quickly does it recover after a current transient?</li>
+      <li>Can it sink charge returned by the load?</li>
+    </ul>
+
+    <h2>Buffering a voltage reference</h2>
+
+    <p>
+    An external buffer can isolate a precision core from a demanding load. The
+    buffer must preserve DC accuracy and low-frequency performance while supplying
+    dynamic current.
+    </p>
+
+    <p>
+    Buffer error contributors include:
+    </p>
+
+    <ul>
+      <li>input offset voltage and offset drift;</li>
+      <li>input bias current flowing through source resistance;</li>
+      <li>voltage and current noise;</li>
+      <li>finite open-loop gain;</li>
+      <li>output swing and current limits;</li>
+      <li>stability with capacitive load;</li>
+      <li>input common-mode range;</li>
+      <li>power-supply rejection.</li>
+    </ul>
+
+    <p>
+    A low-offset amplifier is not automatically a good reference buffer. It must
+    also remain stable with the selected output network and settle within the system
+    timing requirement.
+    </p>
+
+    <h2>Decoupling and PCB layout</h2>
+
+    <p>
+    Reference routing should be treated as an analog signal path, not as an ordinary
+    power rail. Keep it away from fast digital edges, switching nodes, inductors,
+    clock lines, and high-current return paths.
+    </p>
+
+    <p>
+    Practical layout habits include:
+    </p>
+
+    <ul>
+      <li>place required capacitors close to reference and load pins;</li>
+      <li>use a quiet ground return;</li>
+      <li>avoid sharing reference current with noisy loads;</li>
+      <li>use Kelvin sensing when conductor resistance matters;</li>
+      <li>minimize thermocouple junctions in microvolt-level systems;</li>
+      <li>guard high-impedance nodes against leakage;</li>
+      <li>consider thermal gradients from nearby power devices.</li>
+    </ul>
+
+    <p>
+    At high resolution, connector resistance, copper temperature coefficient,
+    solder-joint thermoelectric voltages, and contamination leakage can be visible
+    in the measurement.
+    </p>
+
+    <h2>Reference selection for ADCs and DACs</h2>
+
+    <p>
+    Start with the converter's required reference voltage and input behavior. Then
+    allocate an error budget.
+    </p>
+
+    <p>
+    Example contributors are:
+    </p>
+
+    <ul>
+      <li>initial reference accuracy;</li>
+      <li>reference temperature drift;</li>
+      <li>converter gain error;</li>
+      <li>reference and converter noise;</li>
+      <li>buffer offset and drift;</li>
+      <li>load-transient error;</li>
+      <li>PCB resistance and leakage;</li>
+      <li>calibration residual error.</li>
+    </ul>
+
+    <p>
+    Worst-case errors may be added directly when they are bounded and correlated.
+    Independent random errors are often combined by root-sum-square:
+    </p>
+
+    <pre><code>E_TOTAL,RSS =
+        sqrt(E_1^2 + E_2^2 + ... + E_N^2)
+    </code></pre>
+
+    <p>
+    Do not mix peak-to-peak, RMS, one-sigma, and maximum specifications without
+    converting them to a consistent interpretation.
+    </p>
+
+    <h2>Ratiometric measurement</h2>
+
+    <p>
+    A system can reduce sensitivity to absolute reference value by making both the
+    sensor excitation and ADC conversion depend on the same reference. This is
+    called a ratiometric measurement.
+    </p>
+
+    <p>
+    For example, if a resistive bridge is excited by <code>V_REF</code> and its
+    output is measured by an ADC using the same <code>V_REF</code>, a common change
+    in reference voltage cancels to first order.
+    </p>
+
+    <p>
+    Ratiometric design does not eliminate reference noise, settling, mismatch in
+    separate paths, or timing differences. It mainly removes dependence on absolute
+    DC value.
+    </p>
+
+    <h2>Startup and settling</h2>
+
+    <p>
+    Reference startup time can include several phases:
+    </p>
+
+    <ol>
+      <li>internal bias startup;</li>
+      <li>output charging;</li>
+      <li>amplifier loop settling;</li>
+      <li>filter settling;</li>
+      <li>thermal stabilization;</li>
+      <li>digital trim loading.</li>
+    </ol>
+
+    <p>
+    A voltage may reach 99 percent of final value quickly but require much longer to
+    settle to 10 ppm. The correct timing requirement depends on system resolution.
+    </p>
+
+    <p>
+    Test startup across supply ramp rate, temperature, output capacitance, load, and
+    power-cycle history. A scope view is useful for gross behavior, while precision
+    settling may require a digitizer or differential measurement with higher
+    resolution.
+    </p>
+
+    <h2>Post-silicon characterization plan</h2>
+
+    <h3>1. Initial accuracy</h3>
+
+    <p>
+    Measure multiple devices at room temperature with a calibrated DMM. Record
+    supply, load, trim code, temperature, and warm-up time. Use four-wire or Kelvin
+    techniques when lead resistance matters.
+    </p>
+
+    <h3>2. Temperature sweep</h3>
+
+    <p>
+    Capture enough points to see curvature and hysteresis. Use controlled dwell time.
+    Run both cold-to-hot and hot-to-cold sweeps when thermal hysteresis is important.
+    </p>
+
+    <h3>3. Supply sweep</h3>
+
+    <p>
+    Measure line regulation, dropout, supply current, and recovery. Sweep upward and
+    downward to detect hysteresis or state transitions.
+    </p>
+
+    <h3>4. Load sweep</h3>
+
+    <p>
+    Test the specified source and sink range. Include dynamic loads when the real
+    application contains converters or switched-capacitor inputs.
+    </p>
+
+    <h3>5. Noise measurement</h3>
+
+    <p>
+    Use a low-noise amplifier or analyzer appropriate for the frequency band. Shield
+    the setup, control grounding, and distinguish instrument noise from device
+    noise. Measure both quiet and system-active conditions.
+    </p>
+
+    <h3>6. Startup and repeatability</h3>
+
+    <p>
+    Automate repeated power cycles. Record startup success, overshoot, settling time,
+    and final value. Include brownout, partial rail cycling, and reset sequences.
+    </p>
+
+    <h3>7. Multi-unit statistics</h3>
+
+    <p>
+    Separate mean error, random spread, outliers, and lot-to-lot shift. Correlate
+    reference measurements with trim code, supply current, temperature sensor output,
+    and converter gain.
+    </p>
+
+    <h2>Debugging a reference problem</h2>
+
+    <p>
+    When the measured voltage is wrong, first determine whether the error is static,
+    temperature-dependent, supply-dependent, load-dependent, or intermittent.
+    </p>
+
+    <ol>
+      <li>Verify the measurement instrument and grounding.</li>
+      <li>Confirm the correct node and trim code.</li>
+      <li>Remove or reduce the external load.</li>
+      <li>Check supply headroom and dropout.</li>
+      <li>Observe startup and power sequencing.</li>
+      <li>Measure versus temperature and supply.</li>
+      <li>Disable nearby switching activity.</li>
+      <li>Compare several devices.</li>
+      <li>Inspect the reference buffer and decoupling network.</li>
+    </ol>
+
+    <p>
+    A voltage that changes with load suggests output impedance, buffer current limit,
+    or routing resistance. A voltage that changes strongly with supply suggests
+    headroom or PSRR problems. A rare startup error suggests a startup-state or
+    sequence dependency. A repeatable room-temperature offset may point to trim,
+    resistor ratio, amplifier offset, or measurement loading.
+    </p>
+
+    <h2>Practical takeaway</h2>
+
+    <p>
+    Selecting and validating a voltage reference requires more than choosing the
+    nominal voltage and initial accuracy. Temperature coefficient, noise, long-term
+    drift, line and load regulation, output impedance, startup, buffering,
+    decoupling, and layout all affect real system performance.
+    </p>
+
+    <p>
+    For post-silicon work, preserve the full relationship between reference voltage
+    and operating conditions. A table containing only one nominal value hides the
+    failure signatures that reveal whether the problem comes from the reference
+    core, output buffer, load, supply, trim, layout, or measurement setup.
+    </p>
 - id: ldo_application
   order: 40
   title: How to Successfully Apply Low-Dropout Regulators

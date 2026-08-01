@@ -100,6 +100,7 @@ def test_loads_bundled_learning_library() -> None:
     assert library.lessons[-1].id == "shmoo_and_silent_errors"
     current_mirror = library.lessons[0]
     bandgap = library.lessons[1]
+    voltage_reference = library.lessons[2]
 
     assert current_mirror.id == "current_mirror_types"
     assert len(current_mirror.content_html) > 8_000
@@ -111,6 +112,15 @@ def test_loads_bundled_learning_library() -> None:
     assert len(bandgap.content_html) > 8_000
     assert "Why a stable reference matters" in (
         bandgap.content_html
+    )
+
+    assert (
+        voltage_reference.id
+        == "voltage_reference_fundamentals"
+    )
+    assert len(voltage_reference.content_html) > 8_000
+    assert "What a voltage reference is" in (
+        voltage_reference.content_html
     )
 
     tracks = {

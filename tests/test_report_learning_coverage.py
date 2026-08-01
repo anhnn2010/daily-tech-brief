@@ -159,7 +159,7 @@ def test_json_output_can_show_only_uncurated_lessons(
     ] == ["needs_web"]
 
 
-def test_bundled_library_reports_two_curated_lessons() -> None:
+def test_bundled_library_reports_three_curated_lessons() -> None:
     module = _load_module()
     report = module.load_learning_coverage(
         "config/learning_library.yml"
@@ -167,10 +167,10 @@ def test_bundled_library_reports_two_curated_lessons() -> None:
 
     assert report.total_lessons == 16
     assert report.enabled_lessons == 16
-    assert report.curated_enabled_lessons == 2
-    assert report.uncurated_enabled_lessons == 14
+    assert report.curated_enabled_lessons == 3
+    assert report.uncurated_enabled_lessons == 13
     assert report.next_uncurated_lesson.lesson_id == (
-        "voltage_reference_fundamentals"
+        "ldo_application"
     )
 
 
@@ -194,5 +194,5 @@ def test_script_uses_project_root_default_path(
     )
 
     assert completed.returncode == 0
-    assert "Curated offline lessons:  2" in completed.stdout
-    assert "voltage_reference_fundamentals" in completed.stdout
+    assert "Curated offline lessons:  3" in completed.stdout
+    assert "ldo_application" in completed.stdout
