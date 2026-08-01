@@ -331,7 +331,11 @@ def _process_and_write_ranked_articles(
             generated_at=ranking_result.evaluated_at,
             project_name=str(config.settings["project"]["name"]),
             epub_href=(
-                "digest.epub"
+                (
+                    "digest-full.epub"
+                    if features.get("full_content_epub", False)
+                    else "digest.epub"
+                )
                 if features.get("render_epub", False)
                 else None
             ),

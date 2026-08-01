@@ -168,6 +168,8 @@ jobs:
           test -s output/digest-full.epub
           test -s site/digest.epub
           test -s site/latest/digest.epub
+          test -s site/digest-full.epub
+          test -s site/latest/digest-full.epub
 
           archive_epub="$(
             find site/archive \
@@ -177,9 +179,21 @@ jobs:
               -print \
               -quit
           )"
+          archive_full_epub="$(
+            find site/archive \
+              -type f \
+              -path '*/digest-full.epub' \
+              -exec cmp -s output/digest-full.epub {} \; \
+              -print \
+              -quit
+          )"
 
           if [[ -z "${archive_epub}" ]]; then
-            echo "No archived public EPUB was generated." >&2
+            echo "No archived summary EPUB was generated." >&2
+            exit 1
+          fi
+          if [[ -z "${archive_full_epub}" ]]; then
+            echo "No archived full EPUB was generated." >&2
             exit 1
           fi
 
@@ -187,24 +201,79 @@ jobs:
           cmp output/digest.epub site/latest/digest.epub
           cmp output/digest.epub "${archive_epub}"
 
-          leaked_full_epub="$(
-            find site \
-              -type f \
-              -name 'digest-full.epub' \
-              -print \
-              -quit
-          )"
+          cmp output/digest-full.epub site/digest-full.epub
+          cmp output/digest-full.epub site/latest/digest-full.epub
+          cmp output/digest-full.epub "${archive_full_epub}"
 
-          if [[ -n "${leaked_full_epub}" ]]; then
-            echo "Full EPUB was published to the site: ${leaked_full_epub}" >&2
-            exit 1
-          fi
-
-          grep -q 'href="digest.epub"' site/index.html
+          grep -q 'href="digest-full.epub"' site/index.html
           grep -q 'Download EPUB' site/index.html
 
-          echo "Verified public EPUB: ${archive_epub}"
-          echo "Verified artifact-only EPUB: output/digest-full.epub"
+          echo "Verified summary EPUB: ${archive_epub}"
+          echo "Verified full EPUB: ${archive_full_epub}"
+
+      - name: Verify OPDS catalog
+        shell: bash
+        run: |
+          test -s site/opds/catalog.xml
+
+          opds_date="$(
+            python - <<'PY'
+          import json
+          from pathlib import Path
+
+          metadata = json.loads(
+              Path("site/site.json").read_text(encoding="utf-8")
+          )
+          archive_date = metadata.get("archive_date")
+          if not isinstance(archive_date, str) or not archive_date:
+              raise SystemExit("site.json archive_date is missing")
+          print(archive_date)
+          PY
+          )"
+          opds_book="site/opds/books/daily-tech-brief-${opds_date}.epub"
+
+          test -s "${opds_book}"
+          cmp output/digest-full.epub "${opds_book}"
+
+          python - "${opds_date}" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          edition_date = sys.argv[1]
+          catalog_path = Path("site/opds/catalog.xml")
+          root = ET.parse(catalog_path).getroot()
+          atom = "{http://www.w3.org/2005/Atom}"
+
+          if root.tag != f"{atom}feed":
+              raise SystemExit("OPDS catalog is not an Atom feed")
+
+          expected_href = (
+              "books/"
+              f"daily-tech-brief-{edition_date}.epub"
+          )
+          matches = []
+          for entry in root.findall(f"{atom}entry"):
+              for link in entry.findall(f"{atom}link"):
+                  if (
+                      link.get("rel")
+                      == "http://opds-spec.org/acquisition"
+                      and link.get("href") == expected_href
+                  ):
+                      matches.append(link)
+
+          if len(matches) != 1:
+              raise SystemExit(
+                  "Latest OPDS acquisition entry was not found"
+              )
+          if matches[0].get("type") != "application/epub+zip":
+              raise SystemExit(
+                  "Latest OPDS entry has an invalid media type"
+              )
+          PY
+
+          echo "Verified OPDS catalog: site/opds/catalog.xml"
+          echo "Verified OPDS book: ${opds_book}"
 
       - name: Verify Technical Learning output
         run: |

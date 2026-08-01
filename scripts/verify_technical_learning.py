@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import zipfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -31,6 +32,9 @@ class VerificationResult:
     full_epub_path: Path
     archive_file: Path
     checked_epub_copies: tuple[Path, ...]
+    opds_catalog_path: Path
+    opds_book_path: Path
+    opds_edition_count: int
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -204,7 +208,7 @@ def verify_technical_learning_output(
 
     _require_contains(
         html,
-        'href="digest.epub"',
+        'href="digest-full.epub"',
         source=html_path,
     )
 
@@ -232,11 +236,20 @@ def verify_technical_learning_output(
             source=site_index,
         )
 
-    checked_epub_copies = _verify_epub_copies(
+    checked_public_epub_copies = _verify_epub_copies(
         source_epub=public_epub_path,
         site_dir=site_dir,
+        published_name="digest.epub",
     )
-    _verify_full_epub_not_published(site_dir)
+    checked_full_epub_copies = _verify_epub_copies(
+        source_epub=full_epub_path,
+        site_dir=site_dir,
+        published_name="digest-full.epub",
+    )
+    checked_epub_copies = (
+        checked_public_epub_copies
+        + checked_full_epub_copies
+    )
 
     archive_file = _find_latest_archive_payload(site_dir)
     archive_payload = _read_json_object(archive_file)
@@ -260,6 +273,16 @@ def verify_technical_learning_output(
         archive_file=archive_file,
     )
 
+    (
+        opds_catalog_path,
+        opds_book_path,
+        opds_edition_count,
+    ) = _verify_opds_catalog(
+        site_dir=site_dir,
+        full_epub_path=full_epub_path,
+        archive_file=archive_file,
+    )
+
     origins = enrichment["content_origins"]
 
     return VerificationResult(
@@ -279,7 +302,125 @@ def verify_technical_learning_output(
         full_epub_path=full_epub_path,
         archive_file=archive_file,
         checked_epub_copies=checked_epub_copies,
+        opds_catalog_path=opds_catalog_path,
+        opds_book_path=opds_book_path,
+        opds_edition_count=opds_edition_count,
     )
+
+
+def _verify_opds_catalog(
+    *,
+    site_dir: Path,
+    full_epub_path: Path,
+    archive_file: Path,
+) -> tuple[Path, Path, int]:
+    catalog_path = site_dir / "opds" / "catalog.xml"
+    _require_file(catalog_path)
+
+    archive_root = site_dir / "archive"
+    try:
+        relative_archive = archive_file.parent.relative_to(
+            archive_root
+        )
+    except ValueError as exc:
+        raise VerificationError(
+            f"Archive payload is outside {archive_root}: "
+            f"{archive_file}"
+        ) from exc
+
+    if len(relative_archive.parts) != 3:
+        raise VerificationError(
+            "Archive payload path must use YYYY/MM/DD"
+        )
+
+    edition_date = "-".join(relative_archive.parts)
+    expected_href = (
+        "books/"
+        f"daily-tech-brief-{edition_date}.epub"
+    )
+    expected_book = catalog_path.parent / expected_href
+    _require_file(expected_book)
+
+    if expected_book.read_bytes() != full_epub_path.read_bytes():
+        raise VerificationError(
+            f"{expected_book} does not match {full_epub_path}"
+        )
+
+    try:
+        root = ET.parse(catalog_path).getroot()
+    except ET.ParseError as exc:
+        raise VerificationError(
+            f"{catalog_path} contains invalid XML: {exc}"
+        ) from exc
+
+    atom = "{http://www.w3.org/2005/Atom}"
+    if root.tag != f"{atom}feed":
+        raise VerificationError(
+            f"{catalog_path} root element must be an Atom feed"
+        )
+
+    self_links = [
+        link
+        for link in root.findall(f"{atom}link")
+        if link.get("rel") == "self"
+    ]
+    if len(self_links) != 1:
+        raise VerificationError(
+            f"{catalog_path} must contain exactly one self link"
+        )
+
+    expected_feed_type = (
+        "application/atom+xml;"
+        "profile=opds-catalog;kind=acquisition"
+    )
+    if self_links[0].get("type") != expected_feed_type:
+        raise VerificationError(
+            f"{catalog_path} self link has an invalid media type"
+        )
+
+    entries = root.findall(f"{atom}entry")
+    if not entries:
+        raise VerificationError(
+            f"{catalog_path} does not contain any OPDS editions"
+        )
+
+    matching_entries = []
+    for entry in entries:
+        acquisition_links = [
+            link
+            for link in entry.findall(f"{atom}link")
+            if (
+                link.get("rel")
+                == "http://opds-spec.org/acquisition"
+            )
+        ]
+        for link in acquisition_links:
+            if link.get("href") == expected_href:
+                matching_entries.append((entry, link))
+
+    if len(matching_entries) != 1:
+        raise VerificationError(
+            f"{catalog_path} must contain exactly one acquisition "
+            f"entry for {edition_date}"
+        )
+
+    entry, acquisition = matching_entries[0]
+    if acquisition.get("type") != "application/epub+zip":
+        raise VerificationError(
+            f"{catalog_path} acquisition link has an invalid "
+            "EPUB media type"
+        )
+
+    entry_id = entry.findtext(f"{atom}id", default="").strip()
+    if entry_id != (
+        f"urn:daily-tech-brief:edition:{edition_date}"
+    ):
+        raise VerificationError(
+            f"{catalog_path} contains an invalid edition ID "
+            f"for {edition_date}"
+        )
+
+    return catalog_path, expected_book, len(entries)
 
 
 def _extract_content_enrichment(
@@ -723,11 +864,12 @@ def _verify_epub_copies(
     *,
     source_epub: Path,
     site_dir: Path,
+    published_name: str,
 ) -> tuple[Path, ...]:
     source_bytes = source_epub.read_bytes()
     candidates = (
-        site_dir / "digest.epub",
-        site_dir / "latest" / "digest.epub",
+        site_dir / published_name,
+        site_dir / "latest" / published_name,
     )
     checked: list[Path] = []
 
@@ -743,30 +885,10 @@ def _verify_epub_copies(
 
     if not checked:
         raise VerificationError(
-            "No published site EPUB copy was found"
+            f"No published site copy of {published_name} was found"
         )
 
     return tuple(checked)
-
-
-def _verify_full_epub_not_published(
-    site_dir: Path,
-) -> None:
-    leaked_files = sorted(
-        path
-        for path in site_dir.rglob("digest-full.epub")
-        if path.is_file()
-    )
-
-    if leaked_files:
-        leaked = ", ".join(
-            str(path)
-            for path in leaked_files
-        )
-        raise VerificationError(
-            "Full-content EPUB must remain artifact-only; "
-            f"published copies found: {leaked}"
-        )
 
 
 def _find_latest_archive_payload(
@@ -910,6 +1032,11 @@ def _result_payload(
             str(path)
             for path in result.checked_epub_copies
         ],
+        "opds": {
+            "catalog": str(result.opds_catalog_path),
+            "latest_book": str(result.opds_book_path),
+            "edition_count": result.opds_edition_count,
+        },
     }
 
 
@@ -997,7 +1124,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{result.public_epub_path}"
         )
         print(
-            f"- Full EPUB artifact:  "
+            f"- Full EPUB:           "
             f"{result.full_epub_path}"
         )
         print(
@@ -1006,9 +1133,21 @@ def main(argv: list[str] | None = None) -> int:
         )
         for path in result.checked_epub_copies:
             print(
-                f"- Public EPUB matched: "
+                f"- Published EPUB matched: "
                 f"{path}"
             )
+        print(
+            f"- OPDS catalog:        "
+            f"{result.opds_catalog_path}"
+        )
+        print(
+            f"- OPDS latest book:    "
+            f"{result.opds_book_path}"
+        )
+        print(
+            f"- OPDS editions:       "
+            f"{result.opds_edition_count}"
+        )
 
     return 0
 

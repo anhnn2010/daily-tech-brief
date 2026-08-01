@@ -204,7 +204,7 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
         "### Phase-Locked Loop Fundamentals\n"
     )
     html = (
-        '<html><body><a href="digest.epub">Download EPUB</a>'
+        '<html><body><a href="digest-full.epub">Download EPUB</a>'
         '<section id="technical-learning">'
         '<h2>Technical Learning</h2>'
         '<h3>Phase-Locked Loop Fundamentals</h3>'
@@ -224,11 +224,47 @@ def _build_valid_artifacts(tmp_path: Path) -> tuple[Path, Path]:
     _write_epub(full_epub)
 
     public_epub_bytes = public_epub.read_bytes()
+    full_epub_bytes = full_epub.read_bytes()
     (site_dir / "digest.epub").write_bytes(
         public_epub_bytes
     )
     (site_dir / "latest" / "digest.epub").write_bytes(
         public_epub_bytes
+    )
+    (site_dir / "digest-full.epub").write_bytes(
+        full_epub_bytes
+    )
+    (site_dir / "latest" / "digest-full.epub").write_bytes(
+        full_epub_bytes
+    )
+    (archive_dir / "digest-full.epub").write_bytes(
+        full_epub_bytes
+    )
+
+    opds_dir = site_dir / "opds"
+    opds_books_dir = opds_dir / "books"
+    opds_books_dir.mkdir(parents=True)
+    opds_book = (
+        opds_books_dir
+        / "daily-tech-brief-2026-07-31.epub"
+    )
+    opds_book.write_bytes(full_epub_bytes)
+    (opds_dir / "catalog.xml").write_text(
+        """<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>urn:daily-tech-brief:opds</id>
+  <title>Daily Tech Brief</title>
+  <updated>2026-07-31T00:00:00Z</updated>
+  <link rel="self" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="catalog.xml" />
+  <entry>
+    <id>urn:daily-tech-brief:edition:2026-07-31</id>
+    <title>Daily Tech Brief — 2026-07-31</title>
+    <updated>2026-07-31T00:00:00Z</updated>
+    <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="books/daily-tech-brief-2026-07-31.epub" />
+  </entry>
+</feed>
+""",
+        encoding="utf-8",
     )
 
     return output_dir, site_dir
@@ -260,6 +296,82 @@ def test_verifies_learning_and_full_text_epub_output(
     assert result.content_none == 2
     assert result.public_epub_path == output_dir / "digest.epub"
     assert result.full_epub_path == output_dir / "digest-full.epub"
+    assert result.opds_catalog_path == site_dir / "opds" / "catalog.xml"
+    assert result.opds_book_path == (
+        site_dir
+        / "opds"
+        / "books"
+        / "daily-tech-brief-2026-07-31.epub"
+    )
+    assert result.opds_edition_count == 1
+
+
+def test_rejects_missing_opds_catalog(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    (site_dir / "opds" / "catalog.xml").unlink()
+
+    with pytest.raises(
+        VerificationError,
+        match="Required file not found",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_mismatched_opds_book(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    opds_book = (
+        site_dir
+        / "opds"
+        / "books"
+        / "daily-tech-brief-2026-07-31.epub"
+    )
+    opds_book.write_bytes(b"different EPUB")
+
+    with pytest.raises(
+        VerificationError,
+        match="does not match",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
+
+
+def test_rejects_invalid_opds_acquisition_type(
+    tmp_path: Path,
+) -> None:
+    output_dir, site_dir = _build_valid_artifacts(tmp_path)
+    catalog_path = site_dir / "opds" / "catalog.xml"
+    catalog = catalog_path.read_text(encoding="utf-8")
+    catalog_path.write_text(
+        catalog.replace(
+            'type="application/epub+zip"',
+            'type="application/octet-stream"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        VerificationError,
+        match="invalid EPUB media type",
+    ):
+        verify_technical_learning_output(
+            output_dir=output_dir,
+            site_dir=site_dir,
+            expected_total=12,
+            expected_learning=1,
+        )
 
 
 def test_accepts_legacy_nested_processing_summary(
@@ -460,17 +572,17 @@ def test_rejects_corrupt_full_epub(
         )
 
 
-def test_rejects_full_epub_published_to_site(
+def test_rejects_mismatched_published_full_epub_copy(
     tmp_path: Path,
 ) -> None:
     output_dir, site_dir = _build_valid_artifacts(tmp_path)
     (site_dir / "digest-full.epub").write_bytes(
-        (output_dir / "digest-full.epub").read_bytes()
+        b"different"
     )
 
     with pytest.raises(
         VerificationError,
-        match="must remain artifact-only",
+        match="does not match",
     ):
         verify_technical_learning_output(
             output_dir=output_dir,
@@ -634,10 +746,27 @@ def test_accepts_uncurated_learning_summary_fallback(
         site_dir=site_dir,
         payload=payload,
     )
+    full_epub = output_dir / "digest-full.epub"
     _write_epub(
-        output_dir / "digest-full.epub",
+        full_epub,
         full_content_count=1,
     )
+    full_epub_bytes = full_epub.read_bytes()
+    for copy_path in (
+        site_dir / "digest-full.epub",
+        site_dir / "latest" / "digest-full.epub",
+        site_dir
+        / "archive"
+        / "2026"
+        / "07"
+        / "31"
+        / "digest-full.epub",
+        site_dir
+        / "opds"
+        / "books"
+        / "daily-tech-brief-2026-07-31.epub",
+    ):
+        copy_path.write_bytes(full_epub_bytes)
 
     result = verify_technical_learning_output(
         output_dir=output_dir,

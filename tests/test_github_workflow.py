@@ -86,15 +86,26 @@ def test_workflow_verifies_epub_publication() -> None:
     assert "test -s output/digest-full.epub" in workflow
     assert "test -s site/digest.epub" in workflow
     assert "test -s site/latest/digest.epub" in workflow
+    assert "test -s site/digest-full.epub" in workflow
+    assert "test -s site/latest/digest-full.epub" in workflow
     assert "-path '*/digest.epub'" in workflow
+    assert "-path '*/digest-full.epub'" in workflow
     assert "-exec cmp -s output/digest.epub {} \\;" in workflow
+    assert (
+        "-exec cmp -s output/digest-full.epub {} \\;"
+        in workflow
+    )
     assert "cmp output/digest.epub site/digest.epub" in workflow
-    assert "cmp output/digest.epub site/latest/digest.epub" in workflow
-    assert 'grep -q \'href="digest.epub"\' site/index.html' in workflow
+    assert (
+        "cmp output/digest-full.epub site/digest-full.epub"
+        in workflow
+    )
+    assert (
+        'grep -q \'href="digest-full.epub"\' site/index.html'
+        in workflow
+    )
     assert "grep -q 'Download EPUB' site/index.html" in workflow
-    assert "-name 'digest-full.epub'" in workflow
-    assert "Full EPUB was published to the site" in workflow
-    assert "Verified artifact-only EPUB" in workflow
+    assert "Verified full EPUB" in workflow
 
 
 def test_epub_verification_runs_before_artifact_uploads() -> None:
@@ -249,13 +260,15 @@ def test_learning_coverage_summary_handles_report_errors() -> None:
     assert "exit 0" in workflow
 
 
-def test_full_epub_is_uploaded_only_with_digest_artifact() -> None:
+def test_full_epub_is_uploaded_with_output_and_site_artifacts() -> None:
     workflow = read_workflow()
 
     assert "path: output/" in workflow
     assert "path: site/" in workflow
     assert "test -s output/digest-full.epub" in workflow
-    assert "-name 'digest-full.epub'" in workflow
+    assert "test -s site/digest-full.epub" in workflow
+    assert "test -s site/opds/catalog.xml" in workflow
+    assert "daily-tech-brief-${opds_date}.epub" in workflow
 
 
 def test_pages_artifact_is_uploaded_only_for_production() -> None:
@@ -287,3 +300,47 @@ def test_pages_deploy_job_has_required_configuration() -> None:
         "${{ needs.generate.outputs.pages_artifact_name }}"
         in workflow
     )
+
+
+def test_workflow_verifies_opds_catalog() -> None:
+    workflow = read_workflow()
+
+    assert "name: Verify OPDS catalog" in workflow
+    assert "test -s site/opds/catalog.xml" in workflow
+    assert 'metadata.get("archive_date")' in workflow
+    assert "daily-tech-brief-${opds_date}.epub" in workflow
+    assert 'cmp output/digest-full.epub "${opds_book}"' in workflow
+    assert "http://opds-spec.org/acquisition" in workflow
+    assert "application/epub+zip" in workflow
+    assert "Latest OPDS acquisition entry was not found" in workflow
+    assert "Verified OPDS catalog" in workflow
+    assert "Verified OPDS book" in workflow
+
+
+def test_opds_verification_runs_after_epub_before_learning_and_uploads() -> None:
+    workflow = read_workflow()
+
+    epub_position = workflow.index(
+        "- name: Verify EPUB publication"
+    )
+    opds_position = workflow.index(
+        "- name: Verify OPDS catalog"
+    )
+    learning_position = workflow.index(
+        "- name: Verify Technical Learning output"
+    )
+    output_upload_position = workflow.index(
+        "- name: Upload digest output artifact"
+    )
+    site_upload_position = workflow.index(
+        "- name: Upload static site artifact"
+    )
+    pages_upload_position = workflow.index(
+        "- name: Upload GitHub Pages artifact"
+    )
+
+    assert epub_position < opds_position
+    assert opds_position < learning_position
+    assert opds_position < output_upload_position
+    assert opds_position < site_upload_position
+    assert opds_position < pages_upload_position
