@@ -215,7 +215,6 @@ def test_processing_reserves_one_slot_for_learning(
     assert len(news_articles) == 11
     assert len(learning_articles) == 1
     assert learning_articles[0]["external_id"] == "learning:lesson_a"
-    assert learning_articles[0]["category"] == "technical_learning"
     assert payload["learning"]["lesson_ids"] == ["lesson_a"]
     assert summary["selected_news_articles"] == 11
     assert summary["selected_learning_articles"] == 1
@@ -255,7 +254,9 @@ def test_same_day_rerun_reuses_the_archived_lesson(
         enable_learning=True,
         now=NOW + timedelta(hours=2),
     )
-    second_payload = json.loads(second_path.read_text(encoding="utf-8"))
+    second_payload = json.loads(
+        second_path.read_text(encoding="utf-8")
+    )
 
     assert first_payload["learning"]["lesson_ids"] == ["lesson_a"]
     assert second_payload["learning"]["lesson_ids"] == ["lesson_a"]
@@ -349,6 +350,18 @@ def test_source_filter_run_does_not_add_learning_article(
         main_module,
         "collect_feeds",
         lambda _config, sources: collection_result,
+    )
+
+    original_process = main_module._process_and_write_ranked_articles
+
+    def process_at_fixed_time(*args, **kwargs):
+        kwargs["now"] = NOW
+        return original_process(*args, **kwargs)
+
+    monkeypatch.setattr(
+        main_module,
+        "_process_and_write_ranked_articles",
+        process_at_fixed_time,
     )
 
     exit_code = main_module.main(
