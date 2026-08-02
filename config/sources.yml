@@ -116,6 +116,43 @@ sources:
   - runners
   - devsecops
   - release_automation
+- id: earthly_blog
+  name: Earthly Blog
+  provider: feed
+  format: rss
+  url: https://earthly.dev/blog/feed.xml
+  category: automation_ci
+  priority: 9
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - devops
+  - ci
+  - github_actions
+  - docker
+  - build_automation
+  - shell_script
+- id: circleci_blog
+  name: CircleCI Blog
+  provider: feed
+  format: rss
+  url: https://circleci.com/blog/feed.xml
+  category: automation_ci
+  priority: 8
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - ci_cd
+  - pipelines
+  - test_automation
+  - deployment
+  - devops
 - id: python_insider
   name: Python Insider
   provider: feed
@@ -205,6 +242,61 @@ sources:
   - packages
   - developer_tools
   - community
+- id: testdriven_io
+  name: TestDriven.io
+  provider: feed
+  format: rss
+  url: https://testdriven.io/feed.xml
+  category: python
+  priority: 9
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - python
+  - testing
+  - devops
+  - docker
+  - api
+  - web_scraping
+- id: pybites_blog
+  name: PyBites
+  provider: feed
+  format: rss
+  url: https://pybit.es/feed/
+  category: python
+  priority: 8
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - python
+  - clean_code
+  - testing
+  - automation
+  - developer_productivity
+- id: zyte_blog
+  name: Zyte Blog
+  provider: feed
+  format: rss
+  url: https://www.zyte.com/rss.xml
+  category: python
+  priority: 9
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - web_scraping
+  - scrapy
+  - crawling
+  - data_extraction
+  - python
 - id: arch_linux_news
   name: Arch Linux News
   provider: feed
@@ -248,208 +340,6 @@ sources:
   - kernel
   - releases
   - drivers
-- id: github_blog
-  name: GitHub Blog
-  provider: feed
-  format: rss
-  url: https://github.blog/feed/
-  category: open_source
-  priority: 9
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - engineering
-  - open_source
-  - security
-  - developer_tools
-- id: cncf_blog
-  name: CNCF Blog
-  provider: feed
-  format: rss
-  url: https://www.cncf.io/feed/
-  category: open_source
-  priority: 8
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - kubernetes
-  - cloud_native
-  - platform_engineering
-  - observability
-- id: analog_devices_engineering_mind
-  name: Analog Devices Engineering Mind
-  provider: feed
-  format: rss
-  url: https://ez.analog.com/ez-blogs/b/engineering-mind/rss
-  category: analog_mixed_signal
-  priority: 10
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - analog
-  - mixed_signal
-  - pll
-  - clocking
-  - adc
-  - dac
-  - ltspice
-  - signal_chain
-  - calibration
-  - post_silicon_learning
-- id: synopsys_news
-  name: Synopsys News Releases
-  provider: feed
-  format: rss
-  url: https://news.synopsys.com/home?pagetemplate=rss
-  category: semiconductor
-  priority: 8
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - eda
-  - verification
-  - multi_die
-  - silicon
-- id: cadence_verification
-  name: Cadence Verification Blog
-  provider: feed
-  format: rss
-  url: https://community.cadence.com/cadence_blogs_8/b/fv/rss
-  category: test_engineering
-  priority: 10
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - verification
-  - pcie
-  - cxl
-  - ucie
-  - serdes
-- id: pytest_releases
-  name: pytest Releases
-  provider: feed
-  format: atom
-  url: https://github.com/pytest-dev/pytest/releases.atom
-  category: test_engineering
-  priority: 10
-  cadence: weekly
-  enabled: true
-  official: true
-  tags:
-  - pytest
-  - test_automation
-  - plugins
-  - freelance
-- id: playwright_python_releases
-  name: Playwright Python Releases
-  provider: feed
-  format: atom
-  url: https://github.com/microsoft/playwright-python/releases.atom
-  category: test_engineering
-  priority: 9
-  cadence: weekly
-  enabled: true
-  official: true
-  tags:
-  - browser_automation
-  - e2e
-  - web_testing
-  - freelance
-- id: siemens_verification_horizons
-  name: Siemens Verification Horizons
-  provider: feed
-  format: rss
-  url: https://blogs.sw.siemens.com/verificationhorizons/feed/
-  category: test_engineering
-  priority: 9
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - formal_verification
-  - uvm
-  - dft
-  - hardware_verification
-- id: cadence_corporate
-  name: Cadence Corporate News
-  provider: feed
-  format: rss
-  url: https://community.cadence.com/cadence_blogs_8/b/corporate-news/rss
-  category: semiconductor
-  priority: 7
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - eda
-  - chiplets
-  - ai_for_design
-  - industry
-- id: koreader_releases
-  name: KOReader Releases
-  provider: feed
-  format: atom
-  url: https://github.com/koreader/koreader/releases.atom
-  category: ebook
-  priority: 10
-  cadence: daily
-  enabled: true
-  official: true
-  tags:
-  - koreader
-  - kobo
-  - plugins
-  - releases
-- id: readest_releases
-  name: Readest Releases
-  provider: feed
-  format: atom
-  url: https://github.com/readest/readest/releases.atom
-  category: ebook
-  priority: 9
-  cadence: weekly
-  enabled: true
-  official: true
-  tags:
-  - readest
-  - epub
-  - tts
-  - sync
-- id: ocrmypdf_releases
-  name: OCRmyPDF Releases
-  provider: feed
-  format: atom
-  url: https://github.com/ocrmypdf/OCRmyPDF/releases.atom
-  category: ebook
-  priority: 9
-  cadence: weekly
-  enabled: true
-  official: true
-  tags:
-  - ocr
-  - pdf
-  - document_automation
-  - tesseract
-- id: calibre_releases
-  name: calibre Releases
-  provider: feed
-  format: rss
-  url: https://calibre-ebook.com/changelog.rss
-  category: ebook
-  priority: 8
-  cadence: weekly
-  enabled: true
-  official: true
-  tags:
-  - calibre
-  - epub
-  - conversion
-  - releases
 - id: shellcheck_releases
   name: ShellCheck Releases
   provider: feed
@@ -527,3 +417,260 @@ sources:
   - api_automation
   - shell_script
   - freelance
+- id: julia_evans_blog
+  name: Julia Evans
+  provider: feed
+  format: atom
+  url: https://jvns.ca/atom.xml
+  category: linux
+  priority: 10
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - linux
+  - shell
+  - command_line
+  - debugging
+  - networking
+  - systems
+- id: github_blog
+  name: GitHub Blog
+  provider: feed
+  format: rss
+  url: https://github.blog/feed/
+  category: open_source
+  priority: 9
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - engineering
+  - open_source
+  - security
+  - developer_tools
+- id: cncf_blog
+  name: CNCF Blog
+  provider: feed
+  format: rss
+  url: https://www.cncf.io/feed/
+  category: open_source
+  priority: 8
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - kubernetes
+  - cloud_native
+  - platform_engineering
+  - observability
+- id: analog_devices_engineering_mind
+  name: Analog Devices Engineering Mind
+  provider: feed
+  format: rss
+  url: https://ez.analog.com/ez-blogs/b/engineering-mind/rss
+  category: analog_mixed_signal
+  priority: 10
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - analog
+  - mixed_signal
+  - pll
+  - clocking
+  - adc
+  - dac
+  - ltspice
+  - signal_chain
+  - calibration
+  - post_silicon_learning
+- id: synopsys_news
+  name: Synopsys News Releases
+  provider: feed
+  format: rss
+  url: https://news.synopsys.com/home?pagetemplate=rss
+  category: semiconductor
+  priority: 8
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - eda
+  - verification
+  - multi_die
+  - silicon
+- id: cadence_corporate
+  name: Cadence Corporate News
+  provider: feed
+  format: rss
+  url: https://community.cadence.com/cadence_blogs_8/b/corporate-news/rss
+  category: semiconductor
+  priority: 7
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - eda
+  - chiplets
+  - ai_for_design
+  - industry
+- id: cadence_verification
+  name: Cadence Verification Blog
+  provider: feed
+  format: rss
+  url: https://community.cadence.com/cadence_blogs_8/b/fv/rss
+  category: test_engineering
+  priority: 10
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - verification
+  - pcie
+  - cxl
+  - ucie
+  - serdes
+- id: pytest_releases
+  name: pytest Releases
+  provider: feed
+  format: atom
+  url: https://github.com/pytest-dev/pytest/releases.atom
+  category: test_engineering
+  priority: 10
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - pytest
+  - test_automation
+  - plugins
+  - freelance
+- id: playwright_python_releases
+  name: Playwright Python Releases
+  provider: feed
+  format: atom
+  url: https://github.com/microsoft/playwright-python/releases.atom
+  category: test_engineering
+  priority: 9
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - browser_automation
+  - e2e
+  - web_testing
+  - freelance
+- id: siemens_verification_horizons
+  name: Siemens Verification Horizons
+  provider: feed
+  format: rss
+  url: https://blogs.sw.siemens.com/verificationhorizons/feed/
+  category: test_engineering
+  priority: 9
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - formal_verification
+  - uvm
+  - dft
+  - hardware_verification
+- id: automation_panda
+  name: Automation Panda
+  provider: feed
+  format: rss
+  url: https://automationpanda.com/feed/
+  category: test_engineering
+  priority: 10
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - test_automation
+  - python
+  - pytest
+  - bdd
+  - selenium
+  - ci
+- id: pythontest_blog
+  name: PythonTest
+  provider: feed
+  format: rss
+  url: https://pythontest.com/index.xml
+  category: test_engineering
+  priority: 10
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - learning_candidate
+  - tutorials
+  - python_testing
+  - pytest
+  - tdd
+  - unit_testing
+- id: koreader_releases
+  name: KOReader Releases
+  provider: feed
+  format: atom
+  url: https://github.com/koreader/koreader/releases.atom
+  category: ebook
+  priority: 10
+  cadence: daily
+  enabled: true
+  official: true
+  tags:
+  - koreader
+  - kobo
+  - plugins
+  - releases
+- id: readest_releases
+  name: Readest Releases
+  provider: feed
+  format: atom
+  url: https://github.com/readest/readest/releases.atom
+  category: ebook
+  priority: 9
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - readest
+  - epub
+  - tts
+  - sync
+- id: ocrmypdf_releases
+  name: OCRmyPDF Releases
+  provider: feed
+  format: atom
+  url: https://github.com/ocrmypdf/OCRmyPDF/releases.atom
+  category: ebook
+  priority: 9
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - ocr
+  - pdf
+  - document_automation
+  - tesseract
+- id: calibre_releases
+  name: calibre Releases
+  provider: feed
+  format: rss
+  url: https://calibre-ebook.com/changelog.rss
+  category: ebook
+  priority: 8
+  cadence: weekly
+  enabled: true
+  official: true
+  tags:
+  - calibre
+  - epub
+  - conversion
+  - releases
