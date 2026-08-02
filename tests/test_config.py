@@ -21,6 +21,17 @@ OPTIONAL_FEATURES = (
     "ai_editor",
 )
 
+NEW_TUTORIAL_SOURCE_IDS = {
+    "automation_panda",
+    "pythontest_blog",
+    "testdriven_io",
+    "pybites_blog",
+    "zyte_blog",
+    "earthly_blog",
+    "circleci_blog",
+    "julia_evans_blog",
+}
+
 
 def _copy_bundled_config(tmp_path: Path) -> Path:
     config_dir = tmp_path / "config"
@@ -53,8 +64,8 @@ def test_bundled_configuration_is_valid() -> None:
     config = load_project_config(PROJECT_ROOT / "config")
     sources_by_id = {source.id: source for source in config.sources}
 
-    assert len(config.sources) == 35
-    assert len(config.enabled_sources) == 34
+    assert len(config.sources) == 43
+    assert len(config.enabled_sources) == 42
     assert all(source.official for source in config.sources)
     assert sources_by_id["real_python"].enabled is False
     assert sources_by_id["python_bytes"].enabled is True
@@ -62,6 +73,7 @@ def test_bundled_configuration_is_valid() -> None:
     assert sources_by_id["fastapi_releases"].enabled is True
     assert sources_by_id["shellcheck_releases"].enabled is True
     assert sources_by_id["jq_releases"].enabled is True
+    assert NEW_TUTORIAL_SOURCE_IDS <= set(sources_by_id)
 
     analog_source = sources_by_id[
         "analog_devices_engineering_mind"
@@ -131,6 +143,77 @@ def test_bundled_configuration_is_valid() -> None:
         "shell script",
         "workflow automation",
     } <= high_priority_keywords
+
+
+def test_tutorial_sources_are_enabled_and_tagged() -> None:
+    config = load_project_config(PROJECT_ROOT / "config")
+    sources_by_id = {source.id: source for source in config.sources}
+
+    for source_id in NEW_TUTORIAL_SOURCE_IDS:
+        source = sources_by_id[source_id]
+
+        assert source.enabled is True
+        assert source.provider == "feed"
+        assert "learning_candidate" in source.tags
+        assert "tutorials" in source.tags
+
+
+@pytest.mark.parametrize(
+    ("source_id", "category", "expected_tags"),
+    [
+        (
+            "automation_panda",
+            "test_engineering",
+            {"test_automation", "python", "pytest"},
+        ),
+        (
+            "pythontest_blog",
+            "test_engineering",
+            {"python_testing", "pytest", "unit_testing"},
+        ),
+        (
+            "testdriven_io",
+            "python",
+            {"python", "testing", "devops"},
+        ),
+        (
+            "pybites_blog",
+            "python",
+            {"python", "clean_code", "automation"},
+        ),
+        (
+            "zyte_blog",
+            "python",
+            {"web_scraping", "scrapy", "data_extraction"},
+        ),
+        (
+            "earthly_blog",
+            "automation_ci",
+            {"devops", "ci", "build_automation"},
+        ),
+        (
+            "circleci_blog",
+            "automation_ci",
+            {"ci_cd", "pipelines", "test_automation"},
+        ),
+        (
+            "julia_evans_blog",
+            "linux",
+            {"linux", "shell", "debugging"},
+        ),
+    ],
+)
+def test_tutorial_source_metadata(
+    source_id: str,
+    category: str,
+    expected_tags: set[str],
+) -> None:
+    config = load_project_config(PROJECT_ROOT / "config")
+    sources_by_id = {source.id: source for source in config.sources}
+    source = sources_by_id[source_id]
+
+    assert source.category == category
+    assert expected_tags <= set(source.tags)
 
 
 def test_source_ids_are_unique() -> None:
