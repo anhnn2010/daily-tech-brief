@@ -60,7 +60,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-total",
         type=int,
         default=12,
-        help="Expected total number of ranked articles.",
+        help=(
+            "Maximum allowed number of ranked articles. "
+            "The generated digest may contain fewer articles."
+        ),
     )
     parser.add_argument(
         "--expected-learning",
@@ -118,9 +121,9 @@ def verify_technical_learning_output(
             "the articles list"
         )
 
-    if article_count != expected_total:
+    if article_count > expected_total:
         raise VerificationError(
-            f"Expected {expected_total} total articles, "
+            f"Expected at most {expected_total} total articles, "
             f"found {article_count}"
         )
 
@@ -130,7 +133,7 @@ def verify_technical_learning_output(
     )
     enrichment = _extract_content_enrichment(
         payload,
-        expected_total=expected_total,
+        expected_total=article_count,
     )
 
     learning_articles = [
@@ -216,14 +219,14 @@ def verify_technical_learning_output(
         public_epub_path,
         learning_titles=learning_titles,
         require_learning=bool(expected_learning),
-        expected_articles=expected_total,
+        expected_articles=article_count,
         expected_full_content=0,
     )
     _verify_epub(
         full_epub_path,
         learning_titles=learning_titles,
         require_learning=bool(expected_learning),
-        expected_articles=expected_total,
+        expected_articles=article_count,
         expected_full_content=enrichment["extracted_articles"],
     )
 
@@ -265,7 +268,7 @@ def verify_technical_learning_output(
 
     archive_enrichment = _extract_content_enrichment(
         archive_payload,
-        expected_total=expected_total,
+        expected_total=article_count,
     )
     _verify_archive_enrichment_matches(
         current=enrichment,
