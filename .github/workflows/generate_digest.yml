@@ -14,7 +14,7 @@ on:
 
   schedule:
     # 06:30 in Asia/Ho_Chi_Minh (UTC+7)
-    - cron: "30 23 * * *"
+    - cron: "30 21 * * *"
 
 concurrency:
   group: >-
