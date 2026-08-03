@@ -24,7 +24,7 @@ def test_digest_workflow_has_manual_and_scheduled_triggers() -> None:
 
     assert "workflow_dispatch:" in workflow
     assert "schedule:" in workflow
-    assert 'cron: "30 23 * * *"' in workflow
+    assert 'cron: "30 21 * * *"' in workflow
 
 
 def test_digest_workflow_uses_expected_runtime() -> None:
