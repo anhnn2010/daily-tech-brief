@@ -13,7 +13,7 @@ on:
           - production
 
   schedule:
-    # 06:30 in Asia/Ho_Chi_Minh (UTC+7)
+    # 04:30 in Asia/Ho_Chi_Minh (UTC+7)
     - cron: "30 21 * * *"
 
 concurrency:
@@ -278,7 +278,7 @@ jobs:
       - name: Verify Technical Learning output
         run: |
           python scripts/verify_technical_learning.py \
-            --expected-total 12 \
+            --expected-total 20 \
             --expected-learning 1
 
       - name: Publish full-content report

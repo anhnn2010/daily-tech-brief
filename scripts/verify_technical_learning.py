@@ -59,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--expected-total",
         type=int,
-        default=12,
+        default=20,
         help=(
             "Maximum allowed number of ranked articles. "
             "The generated digest may contain fewer articles."

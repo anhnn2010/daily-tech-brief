@@ -11,7 +11,7 @@ runtime:
   request_timeout_seconds: 20
   content_timeout_seconds: 15
   content_max_download_bytes: 5000000
-  max_articles: 12
+  max_articles: 20
   max_summary_chars: 2000
   user_agent: DailyTechBrief/0.7.0
   fail_on_source_error: false

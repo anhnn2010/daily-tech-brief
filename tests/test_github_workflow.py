@@ -135,7 +135,7 @@ def test_workflow_verifies_technical_learning_output() -> None:
         "python scripts/verify_technical_learning.py"
         in workflow
     )
-    assert "--expected-total 12" in workflow
+    assert "--expected-total 20" in workflow
     assert "--expected-learning 1" in workflow
 
 
@@ -213,7 +213,6 @@ def test_full_content_summary_handles_missing_generation_output() -> None:
     assert "exit 0" in workflow
 
 
-
 def test_workflow_publishes_learning_coverage_job_summary() -> None:
     workflow = read_workflow()
 
@@ -223,7 +222,10 @@ def test_workflow_publishes_learning_coverage_job_summary() -> None:
     assert "python scripts/report_learning_coverage.py" in workflow
     assert "--markdown" in workflow
     assert "--uncurated-only" in workflow
-    assert 'cat "${coverage_report}" >> "${GITHUB_STEP_SUMMARY}"' in workflow
+    assert (
+        'cat "${coverage_report}" >> "${GITHUB_STEP_SUMMARY}"'
+        in workflow
+    )
 
 
 def test_learning_coverage_summary_runs_after_full_content_before_uploads() -> None:
@@ -256,7 +258,10 @@ def test_learning_coverage_summary_handles_report_errors() -> None:
 
     assert "if [[ ! -s config/learning_library.yml ]]" in workflow
     assert "Coverage report could not be generated." in workflow
-    assert 'coverage_report="${RUNNER_TEMP}/technical-learning-coverage.md"' in workflow
+    assert (
+        'coverage_report="${RUNNER_TEMP}/technical-learning-coverage.md"'
+        in workflow
+    )
     assert "exit 0" in workflow
 
 

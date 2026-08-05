@@ -102,6 +102,7 @@ def test_bundled_configuration_is_valid() -> None:
     assert runtime["user_agent"] == "DailyTechBrief/0.7.0"
     assert runtime["content_timeout_seconds"] == 15
     assert runtime["content_max_download_bytes"] == 5_000_000
+    assert runtime["max_articles"] == 20
 
     assert config.settings["features"] == {
         "fetch_feeds": True,
@@ -126,11 +127,19 @@ def test_bundled_configuration_is_valid() -> None:
         "weight": 10,
         "daily_quota": 0,
     }
+    assert categories["ai"]["daily_quota"] == 3
+    assert categories["automation_ci"]["daily_quota"] == 4
+    assert categories["python"]["daily_quota"] == 3
+    assert categories["linux"]["daily_quota"] == 3
+    assert categories["open_source"]["daily_quota"] == 1
+    assert categories["analog_mixed_signal"]["daily_quota"] == 1
     assert categories["semiconductor"]["daily_quota"] == 1
+    assert categories["test_engineering"]["daily_quota"] == 3
+    assert categories["ebook"]["daily_quota"] == 1
     assert sum(
         category["daily_quota"]
         for category in categories.values()
-    ) == 12
+    ) == 20
 
     high_priority_keywords = {
         keyword.casefold()
